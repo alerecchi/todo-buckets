@@ -1,7 +1,7 @@
 import { Todo } from "./Todo"
 
 export interface Bucket {
-    id: number;
+    id: string;
     name: string;
     todos: Todo[];
 }
