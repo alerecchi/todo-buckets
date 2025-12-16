@@ -98,7 +98,7 @@ Key concepts:
 - Tanstack Start's app/routes directory maps to URLs
 - tsx files = TypeScript + JSX
 
-## Phase 1: Static UI Shell
+## [DONE] Phase 1: Static UI Shell
 
 **Goal**: Build the 5-bucket layout (Inbox, Yearly, Monthly, Weekly, Daily) with static mock data.
 
