@@ -21,7 +21,11 @@ export default function TodoCard({ todo }: TodoCardProps) {
       >
         {todo.title}
       </Label>
-      <Button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-transparent hover:bg-gray-100 rounded cursor-pointer">
+      <Button
+        className="opacity-0 group-hover:opacity-100 transition-opacity"
+        variant="ghost"
+        size="sm"
+      >
         <Trash2 className="h-4 w-4 text-red-500" />
       </Button>
     </div>
