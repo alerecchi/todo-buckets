@@ -1,4 +1,3 @@
-import { Bucket } from '@/types/Bucket'
 import { Todo } from '@/types/Todo'
 
 export const todoItem: Todo = {
@@ -6,18 +5,12 @@ export const todoItem: Todo = {
   title: 'Sample Todo Item',
   description: 'This is a sample description for the todo item.',
   completed: false,
+  bucketId: '0',
 }
 
-export const bucketItem: Bucket = {
-  id: '1',
-  name: 'Sample Bucket',
-  todos: Array.from({ length: 3 }, (_, i) => ({
-    ...todoItem,
-    id: `${i + 1}`,
-  })),
-}
-
-export const bucketList: Bucket[] = Array.from({ length: 5 }, (_, i) => ({
-  ...bucketItem,
+export const mockTodoList: Todo[] = Array.from({ length: 15 }, (_, i) => ({
+  ...todoItem,
   id: `${i}`,
+  title: `Sample Todo Item ${i}`,
+  bucketId: `${i % 5}`,
 }))
