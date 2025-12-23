@@ -17,11 +17,11 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-devtools": "^0.8.4",
-    "@tanstack/react-router": "^1.141.6",
-    "@tanstack/react-router-devtools": "^1.141.6",
-    "@tanstack/react-router-ssr-query": "^1.141.6",
-    "@tanstack/react-start": "^1.141.7",
-    "@tanstack/router-plugin": "^1.141.7",
+    "@tanstack/react-router": "^1.143.3",
+    "@tanstack/react-router-devtools": "^1.143.3",
+    "@tanstack/react-router-ssr-query": "^1.143.3",
+    "@tanstack/react-start": "^1.143.3",
+    "@tanstack/router-plugin": "^1.143.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",
@@ -48,5 +48,8 @@
     "vitest": "^4.0.16",
     "web-vitals": "^5.1.0"
   },
-  "packageManager": "pnpm@10.26.1"
+  "packageManager": "pnpm@10.26.2",
+  "engines": {
+    "node": ">=25.0.0"
+  }
 }
