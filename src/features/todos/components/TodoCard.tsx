@@ -1,8 +1,8 @@
 import { GripVertical, Trash2 } from 'lucide-react'
 import { Todo } from '@/types/Todo'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/features/shared/components/ui/checkbox'
+import { Button } from '@/features/shared/components/ui/button'
+import { Label } from '@/features/shared/components/ui/label'
 
 interface TodoCardProps {
   todo: Todo

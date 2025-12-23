@@ -48,5 +48,8 @@
     "vitest": "^4.0.16",
     "web-vitals": "^5.1.0"
   },
-  "packageManager": "pnpm@10.26.1"
+  "packageManager": "pnpm@10.26.2",
+  "engines": {
+    "node": ">=25.0.0"
+  }
 }
