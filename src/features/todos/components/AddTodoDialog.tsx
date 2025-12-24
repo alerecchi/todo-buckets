@@ -20,7 +20,7 @@ export default function AddTodoDialog({
   setOpen,
   addTodo,
 }: AddTodoDialogProps) {
-  let [text, setText] = useState('')
+  const [text, setText] = useState('')
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
