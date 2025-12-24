@@ -18,7 +18,7 @@ export function BucketColumn({
   removeTodo,
   toggleTodo,
 }: BucketProps) {
-  let [isDialogOpen, setDialogOpen] = useState(false)
+  const [isDialogOpen, setDialogOpen] = useState(false)
 
   return (
     <div className="flex flex-col gap-4 min-h-[100px] p-2 rounded-lg border-2 border-dashed border-border bg-muted/20">

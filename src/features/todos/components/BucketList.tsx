@@ -20,35 +20,23 @@ export function BucketList() {
   }
 
   const removeTodo = (todoId: string) => {
-    const newTodoList = todoList.filter((value) => value.id != todoId)
+    const newTodoList = todoList.filter((value) => value.id !== todoId)
     setTodoList(newTodoList)
   }
 
   const toggleTodo = (todoId: string) => {
-    const newTodoList = todoList.map((value) => {
-      if (value.id === todoId) {
-        return (value = {
-          ...value,
-          completed: !value.completed,
-        })
-      } else {
-        return value
-      }
-    })
+    const newTodoList = todoList.map((value) =>
+      value.id === todoId ? { ...value, completed: !value.completed } : value,
+    )
     setTodoList(newTodoList)
   }
 
-  const moveTodo = (todoId: String) => {
-    const newTodoList = todoList.map((value) => {
-      if (value.id === todoId) {
-        return (value = {
-          ...value,
-          bucketId: (Number(value.bucketId) + 1).toString(),
-        })
-      } else {
-        return value
-      }
-    })
+  const moveTodo = (todoId: string) => {
+    const newTodoList = todoList.map((value) =>
+      value.id === todoId
+        ? { ...value, bucketId: (Number(value.bucketId) + 1).toString() }
+        : value,
+    )
     setTodoList(newTodoList)
   }
 
@@ -73,7 +61,13 @@ export function BucketList() {
   return (
     <div className="container mx-auto grid grid-cols-5 gap-4">
       {bucketList.map((bucket) => (
-        <BucketColumn key={bucket.id} bucket={bucket} addTodo={addTodo} removeTodo={removeTodo} toggleTodo={toggleTodo} />
+        <BucketColumn
+          key={bucket.id}
+          bucket={bucket}
+          addTodo={addTodo}
+          removeTodo={removeTodo}
+          toggleTodo={toggleTodo}
+        />
       ))}
       <div>
         <Button onClick={() => moveTodo(todoList[0].id)}>move todo</Button>
