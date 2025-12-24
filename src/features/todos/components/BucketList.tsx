@@ -9,7 +9,7 @@ export function BucketList({ bucketList }: BucketListProps) {
   return (
     <div className="container mx-auto grid grid-cols-5 gap-4">
       {bucketList.map((bucketItem) => (
-        <BucketColumn bucket={bucketItem} />
+        <BucketColumn key={bucketItem.id} bucket={bucketItem} />
       ))}
     </div>
   )
