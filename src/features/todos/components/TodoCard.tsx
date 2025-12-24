@@ -6,13 +6,23 @@ import { Label } from '@/features/shared/components/ui/label'
 
 interface TodoCardProps {
   todo: Todo
+  removeTodo: (todoId: string) => void
+  toggleTodo: (todoId: string) => void
 }
 
-export default function TodoCard({ todo }: TodoCardProps) {
+export default function TodoCard({
+  todo,
+  removeTodo,
+  toggleTodo,
+}: TodoCardProps) {
   return (
     <div className="group flex items-center gap-2 p-3 bg-card rounded-lg border border-border hover:border-foreground/20 transition-colors">
       <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab active:cursor-grabbing" />
-      <Checkbox id={`todo-${todo.id}`} checked={todo.completed} />
+      <Checkbox
+        id={`todo-${todo.id}`}
+        checked={todo.completed}
+        onCheckedChange={() => toggleTodo(todo.id)}
+      />
       <Label
         className={`flex-1 cursor-pointer ${
           todo.completed ? 'line-through text-gray-400' : 'text-gray-900'
@@ -25,6 +35,7 @@ export default function TodoCard({ todo }: TodoCardProps) {
         className="opacity-0 group-hover:opacity-100 transition-opacity"
         variant="ghost"
         size="sm"
+        onClick={() => removeTodo(todo.id)}
       >
         <Trash2 className="h-4 w-4 text-red-500" />
       </Button>

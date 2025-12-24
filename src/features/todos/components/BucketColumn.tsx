@@ -7,9 +7,17 @@ import { useState } from 'react'
 
 interface BucketProps {
   bucket: Bucket
+  addTodo: (todo: string) => void
+  removeTodo: (todoId: string) => void
+  toggleTodo: (todoId: string) => void
 }
 
-export function BucketColumn({ bucket }: BucketProps) {
+export function BucketColumn({
+  bucket,
+  addTodo,
+  removeTodo,
+  toggleTodo,
+}: BucketProps) {
   let [isDialogOpen, setDialogOpen] = useState(false)
 
   return (
@@ -25,12 +33,17 @@ export function BucketColumn({ bucket }: BucketProps) {
         <AddTodoDialog
           open={isDialogOpen}
           setOpen={setDialogOpen}
-          addTodo={(text) => console.log(text)}
+          addTodo={addTodo}
         />
       </div>
       <div className="flex flex-col gap-2">
         {bucket.todos.map((todoItem) => (
-          <TodoCard key={todoItem.id} todo={todoItem} />
+          <TodoCard
+            key={todoItem.id}
+            todo={todoItem}
+            removeTodo={removeTodo}
+            toggleTodo={toggleTodo}
+          />
         ))}
       </div>
     </div>
