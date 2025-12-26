@@ -3,7 +3,7 @@ import TodoCard from './TodoCard'
 import { Bucket } from '@/types/Bucket'
 import { Button } from '@/features/shared/components/ui/button'
 import AddTodoDialog from './AddTodoDialog'
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 
 interface BucketProps {
   bucket: Bucket
@@ -19,7 +19,6 @@ export function BucketColumn({
   toggleTodo,
 }: BucketProps) {
   const [isDialogOpen, setDialogOpen] = useState(false)
-  const openDialog = useCallback(() => setDialogOpen(true), [])
 
   return (
     <div className="flex flex-col gap-4 min-h-[100px] p-2 rounded-lg border-2 border-dashed border-border bg-muted/20">
@@ -28,7 +27,7 @@ export function BucketColumn({
           <Inbox />
           <h2 className="text-lg font-semibold">{bucket.name}</h2>
         </div>
-        <Button variant="ghost" size="sm" onClick={openDialog}>
+        <Button variant="ghost" size="sm" onClick={() => setDialogOpen(true)}>
           <Plus className="h-4 w-4" />
         </Button>
         <AddTodoDialog

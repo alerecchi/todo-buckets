@@ -1,5 +1,5 @@
 import { BucketColumn } from './BucketColumn'
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import { Todo } from '@/types/Todo'
 import { Button } from '@/features/shared/components/ui/button'
 import { Bucket } from '@/types/Bucket'
@@ -8,7 +8,7 @@ import { mockBuckets } from '@/lib/mockData'
 export function BucketList() {
   const [buckets, setBuckets] = useState<Record<string, Bucket>>(mockBuckets)
 
-  const addTodo = useCallback((todo: string, bucketId: string) => {
+  const addTodo = (todo: string, bucketId: string) => {
     setBuckets((prev) => {
       const newTodo: Todo = {
         id: (Math.random() * 100).toString(),
@@ -23,9 +23,9 @@ export function BucketList() {
         [bucketId]: { ...bucket, todos: [...bucket.todos, newTodo] },
       }
     })
-  }, [])
+  }
 
-  const removeTodo = useCallback((todoId: string, bucketId: string) => {
+  const removeTodo = (todoId: string, bucketId: string) => {
     setBuckets((prev) => {
       const bucket = prev[bucketId]
       return {
@@ -36,9 +36,9 @@ export function BucketList() {
         },
       }
     })
-  }, [])
+  }
 
-  const toggleTodo = useCallback((todoId: string, bucketId: string) => {
+  const toggleTodo = (todoId: string, bucketId: string) => {
     setBuckets((prev) => {
       const bucket = prev[bucketId]
       return {
@@ -53,10 +53,10 @@ export function BucketList() {
         },
       }
     })
-  }, [])
+  }
 
   //TODO: this is for demo purpose only
-  const moveTodo = useCallback((todoId: string) => {
+  const moveTodo = (todoId: string) => {
     setBuckets((prev) => {
       const bucket = prev['0']
       const nextBucket = prev['1']
@@ -73,7 +73,7 @@ export function BucketList() {
         },
       }
     })
-  }, [])
+  }
 
   const bucketList = Object.values(buckets).sort(
     (a, b) => Number(a.id) - Number(b.id),
