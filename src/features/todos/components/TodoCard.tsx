@@ -6,12 +6,14 @@ import { Label } from '@/features/shared/components/ui/label'
 
 interface TodoCardProps {
   todo: Todo
-  removeTodo: (todoId: string) => void
-  toggleTodo: (todoId: string) => void
+  bucketId: string
+  removeTodo: (todoId: string, bucketId: string) => void
+  toggleTodo: (todoId: string, bucketId: string) => void
 }
 
 export default function TodoCard({
   todo,
+  bucketId,
   removeTodo,
   toggleTodo,
 }: TodoCardProps) {
@@ -21,7 +23,7 @@ export default function TodoCard({
       <Checkbox
         id={`todo-${todo.id}`}
         checked={todo.completed}
-        onCheckedChange={() => toggleTodo(todo.id)}
+        onCheckedChange={() => toggleTodo(todo.id, bucketId)}
       />
       <Label
         className={`flex-1 cursor-pointer ${
@@ -35,7 +37,7 @@ export default function TodoCard({
         className="opacity-0 group-hover:opacity-100 transition-opacity"
         variant="ghost"
         size="sm"
-        onClick={() => removeTodo(todo.id)}
+        onClick={() => removeTodo(todo.id, bucketId)}
       >
         <Trash2 className="h-4 w-4 text-red-500" />
       </Button>

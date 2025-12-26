@@ -1,4 +1,5 @@
 import { Todo } from '@/types/Todo'
+import { Bucket } from '@/types/Bucket'
 
 export const todoItem: Todo = {
   id: '1',
@@ -8,9 +9,19 @@ export const todoItem: Todo = {
   bucketId: '0',
 }
 
-export const mockTodoList: Todo[] = Array.from({ length: 15 }, (_, i) => ({
-  ...todoItem,
-  id: `${i}`,
-  title: `Sample Todo Item ${i}`,
-  bucketId: `${i % 5}`,
-}))
+function getMockTodoList(startIndex: number, bucketId: string): Todo[] {
+  return Array.from({ length: 5 }, (_, i) => ({
+    ...todoItem,
+    id: `${i + startIndex}`,
+    title: `Sample Todo Item ${i + startIndex}`,
+    bucketId: bucketId,
+  }))
+}
+
+export const mockBuckets: Record<string, Bucket> = {
+  '0': { id: '0', name: 'Bucket 0', todos: getMockTodoList(0, '0') },
+  '1': { id: '1', name: 'Bucket 1', todos: getMockTodoList(5, '1') },
+  '2': { id: '2', name: 'Bucket 2', todos: getMockTodoList(10, '2') },
+  '3': { id: '3', name: 'Bucket 3', todos: getMockTodoList(15, '3') },
+  '4': { id: '4', name: 'Bucket 4', todos: getMockTodoList(20, '4') },
+}
