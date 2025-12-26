@@ -1,62 +1,78 @@
 import { BucketColumn } from './BucketColumn'
-import { useState } from 'react'
-import { mockTodoList } from '@/lib/mockData'
+import { useCallback, useState } from 'react'
 import { Todo } from '@/types/Todo'
 import { Button } from '@/features/shared/components/ui/button'
 import { Bucket } from '@/types/Bucket'
+import { mockBuckets } from '@/lib/mockData'
 
 export function BucketList() {
-  let [todoList, setTodoList] = useState(mockTodoList)
+  const [buckets, setButckets] = useState<Record<string, Bucket>>(mockBuckets)
 
-  const addTodo = (todo: string) => {
-    const newTodo: Todo = {
-      id: (Math.random() * 100).toString(),
-      title: todo,
-      description: '',
-      completed: false,
-      bucketId: '0',
-    }
-    setTodoList([...todoList, newTodo])
-  }
+  const addTodo = useCallback((todo: string, bucketId: string) => {
+    setButckets((prev) => {
+      const newTodo: Todo = {
+        id: (Math.random() * 100).toString(),
+        title: todo,
+        description: '',
+        completed: false,
+        bucketId: bucketId,
+      }
+      const bucket = prev[bucketId]
+      return {
+        ...prev,
+        [bucketId]: { ...bucket, todos: [...bucket.todos, newTodo] },
+      }
+    })
+  }, [])
 
-  const removeTodo = (todoId: string) => {
-    const newTodoList = todoList.filter((value) => value.id !== todoId)
-    setTodoList(newTodoList)
-  }
+  const removeTodo = useCallback((todoId: string, bucketId: string) => {
+    setButckets((prev) => {
+      const bucket = prev[bucketId]
+      return {
+        ...prev,
+        [bucketId]: {
+          ...bucket,
+          todos: bucket.todos.filter((value) => value.id !== todoId),
+        },
+      }
+    })
+  }, [])
 
-  const toggleTodo = (todoId: string) => {
-    const newTodoList = todoList.map((value) =>
-      value.id === todoId ? { ...value, completed: !value.completed } : value,
-    )
-    setTodoList(newTodoList)
-  }
+  const toggleTodo = useCallback((todoId: string, bucketId: string) => {
+    setButckets((prev) => {
+      const bucket = prev[bucketId]
+      return {
+        ...prev,
+        [bucketId]: {
+          ...bucket,
+          todos: bucket.todos.map((value) =>
+            value.id === todoId
+              ? { ...value, completed: !value.completed }
+              : value,
+          ),
+        },
+      }
+    })
+  }, [])
 
-  const moveTodo = (todoId: string) => {
-    const newTodoList = todoList.map((value) =>
-      value.id === todoId
-        ? { ...value, bucketId: (Number(value.bucketId) + 1).toString() }
-        : value,
-    )
-    setTodoList(newTodoList)
-  }
+  //TODO: this is for demo purpose only
+  const moveTodo = useCallback((todoId: string) => {
+    setButckets((prev) => {
+      const bucket = prev['0']
+      const nextBucket = prev['1']
+      const todo: Todo = bucket.todos.find((t) => t.id == todoId)!!
+      return {
+        ...prev,
+        ['0']: {
+          ...bucket,
+          todos: bucket.todos.filter((value) => value.id !== todoId),
+        },
+        ['1']: { ...nextBucket, todos: [...nextBucket.todos, todo] },
+      }
+    })
+  }, [])
 
-  const todoMap = new Map<string, Todo[]>()
-  for (const todo of todoList) {
-    const arr = todoMap.get(todo.bucketId)
-    if (arr) arr.push(todo)
-    else todoMap.set(todo.bucketId, [todo])
-  }
-
-  const bucketList: Bucket[] = []
-  todoMap.forEach((todos, bucketId) => {
-    const bucket: Bucket = {
-      id: bucketId,
-      todos: todos,
-      name: `Bucket ${bucketId}`,
-    }
-    bucketList.push(bucket)
-  })
-  bucketList.sort((a, b) => Number(a.id) - Number(b.id))
+  const bucketList = Object.values(buckets).sort((a, b) => Number(a.id) - Number(b.id))
 
   return (
     <div className="container mx-auto grid grid-cols-5 gap-4">
@@ -70,7 +86,7 @@ export function BucketList() {
         />
       ))}
       <div>
-        <Button onClick={() => moveTodo(todoList[0].id)}>move todo</Button>
+        <Button onClick={() => moveTodo(buckets['0'].todos[0].id)}>move todo</Button>
       </div>
     </div>
   )

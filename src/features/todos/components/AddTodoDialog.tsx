@@ -11,12 +11,14 @@ import { FormEvent, useState } from 'react'
 
 interface AddTodoDialogProps {
   open: boolean
+  bucketId: string
   setOpen: (open: boolean) => void
-  addTodo: (text: string) => void
+  addTodo: (text: string, bucketId: string) => void
 }
 
 export default function AddTodoDialog({
   open,
+  bucketId,
   setOpen,
   addTodo,
 }: AddTodoDialogProps) {
@@ -25,7 +27,7 @@ export default function AddTodoDialog({
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (text.trim()) {
-      addTodo(text)
+      addTodo(text, bucketId)
       setText('')
       setOpen(false)
     }
