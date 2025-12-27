@@ -1,5 +1,5 @@
-import { Todo } from '@/types/Todo'
-import { Bucket } from '@/types/Bucket'
+import { Todo } from '@/features/todos/types/Todo'
+import { Bucket } from '@/features/todos/types/Bucket'
 
 export const todoItem: Todo = {
   id: '1',

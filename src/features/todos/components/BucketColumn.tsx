@@ -1,6 +1,6 @@
 import { Inbox, Plus } from 'lucide-react'
 import TodoCard from './TodoCard'
-import { Bucket } from '@/types/Bucket'
+import { Bucket } from '@/features/todos/types/Bucket'
 import { Button } from '@/features/shared/components/ui/button'
 import AddTodoDialog from './AddTodoDialog'
 import { useState } from 'react'
@@ -42,7 +42,6 @@ export function BucketColumn({
           <TodoCard
             key={todoItem.id}
             todo={todoItem}
-            bucketId={bucket.id}
             removeTodo={removeTodo}
             toggleTodo={toggleTodo}
           />

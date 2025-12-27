@@ -1,19 +1,17 @@
 import { GripVertical, Trash2 } from 'lucide-react'
-import { Todo } from '@/types/Todo'
+import { Todo } from '@/features/todos/types/Todo'
 import { Checkbox } from '@/features/shared/components/ui/checkbox'
 import { Button } from '@/features/shared/components/ui/button'
 import { Label } from '@/features/shared/components/ui/label'
 
 interface TodoCardProps {
   todo: Todo
-  bucketId: string
   removeTodo: (todoId: string, bucketId: string) => void
   toggleTodo: (todoId: string, bucketId: string) => void
 }
 
 export default function TodoCard({
   todo,
-  bucketId,
   removeTodo,
   toggleTodo,
 }: TodoCardProps) {
@@ -23,7 +21,7 @@ export default function TodoCard({
       <Checkbox
         id={`todo-${todo.id}`}
         checked={todo.completed}
-        onCheckedChange={() => toggleTodo(todo.id, bucketId)}
+        onCheckedChange={() => toggleTodo(todo.id, todo.bucketId)}
       />
       <Label
         className={`flex-1 cursor-pointer ${
@@ -37,7 +35,7 @@ export default function TodoCard({
         className="opacity-0 group-hover:opacity-100 transition-opacity"
         variant="ghost"
         size="sm"
-        onClick={() => removeTodo(todo.id, bucketId)}
+        onClick={() => removeTodo(todo.id, todo.bucketId)}
       >
         <Trash2 className="h-4 w-4 text-red-500" />
       </Button>

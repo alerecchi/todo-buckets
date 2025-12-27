@@ -1,9 +1,9 @@
 import { BucketColumn } from './BucketColumn'
 import { useState } from 'react'
-import { Todo } from '@/types/Todo'
+import { Todo } from '@/features/todos/types/Todo'
 import { Button } from '@/features/shared/components/ui/button'
-import { Bucket } from '@/types/Bucket'
-import { mockBuckets } from '@/lib/mockData'
+import { Bucket } from '@/features/todos/types/Bucket'
+import { mockBuckets } from '@/features/shared/lib/mockData'
 
 export function BucketList() {
   const [buckets, setBuckets] = useState<Record<string, Bucket>>(mockBuckets)
