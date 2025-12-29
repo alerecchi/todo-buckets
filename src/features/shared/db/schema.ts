@@ -1,4 +1,11 @@
-import { integer, pgTable, varchar, pgEnum, boolean } from 'drizzle-orm/pg-core'
+import {
+  integer,
+  pgTable,
+  varchar,
+  pgEnum,
+  boolean,
+  timestamp,
+} from 'drizzle-orm/pg-core'
 
 export const usersTable = pgTable('users', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -20,18 +27,19 @@ export const bucketsTable = pgTable('buckets', {
   type: bucketTypeEnum().notNull(),
   status: bucketStatusEnum().notNull(),
   userId: integer()
-    .references(() => usersTable.id)
+    .references(() => usersTable.id, { onDelete: 'cascade' })
     .notNull(),
 })
 
 export const todosTable = pgTable('todos', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  name: varchar({ length: 255 }).notNull(),
+  title: varchar({ length: 255 }).notNull(),
   completed: boolean().notNull(),
+  createdAt: timestamp({ withTimezone: true }).defaultNow(),
   bucketId: integer()
-    .references(() => bucketsTable.id)
+    .references(() => bucketsTable.id, { onDelete: 'cascade' })
     .notNull(),
   userId: integer()
-    .references(() => usersTable.id)
+    .references(() => usersTable.id, { onDelete: 'cascade' })
     .notNull(),
 })
