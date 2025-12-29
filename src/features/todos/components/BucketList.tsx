@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Todo } from '@/features/todos/types/Todo'
 import { Button } from '@/features/shared/components/ui/button'
 import { Bucket } from '@/features/todos/types/Bucket'
-import { mockBuckets } from '@/features/shared/lib/mockData'
+import { mockBuckets } from '@/features/todos/mockData'
 
 export function BucketList() {
   const [buckets, setBuckets] = useState<Record<string, Bucket>>(mockBuckets)
