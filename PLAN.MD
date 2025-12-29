@@ -54,7 +54,7 @@ Forces intentional task prioritization through temporal constraints and explicit
 
 ### Frontend Framework
 
-- React — Component-based UI library
+- React 19 with React Compiler enabled
 - Tanstack Start
 - Styling & UI Components
   - Tailwind CSS
@@ -123,7 +123,7 @@ Key concepts:
 - map() is how you render lists
 - Components should be pure functions when possible
 
-## Phase 2: Client-Side State Management
+## [DONE] Phase 2: Client-Side State Management
 
 **Goal**: Make todos interactive. Add, delete, and move todos between buckets (in-memory only, no persistence yet).
 
@@ -147,7 +147,7 @@ Key concepts:
 - This is similar to StateFlow in Android — you emit new state, don't mutate the old one
 - Parent component owns state; children receive props and call callbacks
 
-## Phase 3: Database Schema & Drizzle Setup
+## [DONE] Phase 3: Database Schema & Drizzle Setup
 
 **Goal**: Define your data model including bucket lifecycle and set up Drizzle with Neon.
 
