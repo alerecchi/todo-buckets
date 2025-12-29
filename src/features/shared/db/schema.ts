@@ -26,7 +26,7 @@ export const bucketsTable = pgTable('buckets', {
   period: varchar({ length: 20 }).notNull(),
   type: bucketTypeEnum().notNull(),
   status: bucketStatusEnum().notNull(),
-  userId: integer()
+  userId: integer("user_id")
     .references(() => usersTable.id, { onDelete: 'cascade' })
     .notNull(),
 })
@@ -35,11 +35,11 @@ export const todosTable = pgTable('todos', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   title: varchar({ length: 255 }).notNull(),
   completed: boolean().notNull(),
-  createdAt: timestamp({ withTimezone: true }).defaultNow(),
-  bucketId: integer()
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  bucketId: integer("bucket_id")
     .references(() => bucketsTable.id, { onDelete: 'cascade' })
     .notNull(),
-  userId: integer()
+  userId: integer("user_id")
     .references(() => usersTable.id, { onDelete: 'cascade' })
     .notNull(),
 })

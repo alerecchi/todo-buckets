@@ -6,8 +6,8 @@ import { Label } from '@/features/shared/components/ui/label'
 
 interface TodoCardProps {
   todo: Todo
-  removeTodo: (todoId: string, bucketId: string) => void
-  toggleTodo: (todoId: string, bucketId: string) => void
+  removeTodo: (todoId: number, bucketId: number) => void
+  toggleTodo: (todoId: number, bucketId: number) => void
 }
 
 export default function TodoCard({

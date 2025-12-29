@@ -8,13 +8,13 @@ import { mockBuckets } from '@/features/todos/mockData'
 export function BucketList() {
   const [buckets, setBuckets] = useState<Record<string, Bucket>>(mockBuckets)
 
-  const addTodo = (todo: string, bucketId: string) => {
+  const addTodo = (todo: string, bucketId: number) => {
     setBuckets((prev) => {
       const newTodo: Todo = {
-        id: (Math.random() * 100).toString(),
+        id: (Math.random() * 100),
         title: todo,
-        description: '',
         completed: false,
+        createdAt: new Date().toISOString(),
         bucketId: bucketId,
       }
       const bucket = prev[bucketId]
@@ -25,7 +25,7 @@ export function BucketList() {
     })
   }
 
-  const removeTodo = (todoId: string, bucketId: string) => {
+  const removeTodo = (todoId: number, bucketId: number) => {
     setBuckets((prev) => {
       const bucket = prev[bucketId]
       return {
@@ -38,7 +38,7 @@ export function BucketList() {
     })
   }
 
-  const toggleTodo = (todoId: string, bucketId: string) => {
+  const toggleTodo = (todoId: number, bucketId: number) => {
     setBuckets((prev) => {
       const bucket = prev[bucketId]
       return {
@@ -56,7 +56,7 @@ export function BucketList() {
   }
 
   //TODO: this is for demo purpose only
-  const moveTodo = (todoId: string) => {
+  const moveTodo = (todoId: number) => {
     setBuckets((prev) => {
       const bucket = prev['0']
       const nextBucket = prev['1']
@@ -69,7 +69,7 @@ export function BucketList() {
         },
         ['1']: {
           ...nextBucket,
-          todos: [...nextBucket.todos, { ...todo, bucketId: '1' }],
+          todos: [...nextBucket.todos, { ...todo, bucketId: 1 }],
         },
       }
     })

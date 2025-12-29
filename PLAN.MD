@@ -48,12 +48,8 @@ Forces intentional task prioritization through temporal constraints and explicit
 
 ## Tech Stack
 
-### Language
-
 - TypeScript
-
-### Frontend Framework
-
+- Feature based folder structure (server code co-located into the feature folders)
 - React 19 with React Compiler enabled
 - Tanstack Start
 - Styling & UI Components

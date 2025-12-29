@@ -6,3 +6,11 @@ const envSchema = z.object({
 
 // Validate server environment
 export const serverEnv = envSchema.parse(process.env)
+
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv {
+      readonly DATABASE_URL: string
+    }
+  }
+}
