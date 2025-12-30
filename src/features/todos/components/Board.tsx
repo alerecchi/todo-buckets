@@ -8,13 +8,13 @@ import { mockBuckets } from '@/features/todos/mockData'
 export function BucketList() {
   const [buckets, setBuckets] = useState<Record<string, Bucket>>(mockBuckets)
 
-  const addTodo = (todo: string, bucketId: string) => {
+  const addTodo = (todo: string, bucketId: number) => {
     setBuckets((prev) => {
       const newTodo: Todo = {
-        id: (Math.random() * 100).toString(),
+        id: Math.floor(Math.random() * 1000000),
         title: todo,
-        description: '',
         completed: false,
+        createdAt: new Date().toISOString(),
         bucketId: bucketId,
       }
       const bucket = prev[bucketId]
@@ -25,7 +25,7 @@ export function BucketList() {
     })
   }
 
-  const removeTodo = (todoId: string, bucketId: string) => {
+  const removeTodo = (todoId: number, bucketId: number) => {
     setBuckets((prev) => {
       const bucket = prev[bucketId]
       return {
@@ -38,7 +38,7 @@ export function BucketList() {
     })
   }
 
-  const toggleTodo = (todoId: string, bucketId: string) => {
+  const toggleTodo = (todoId: number, bucketId: number) => {
     setBuckets((prev) => {
       const bucket = prev[bucketId]
       return {
@@ -56,11 +56,11 @@ export function BucketList() {
   }
 
   //TODO: this is for demo purpose only
-  const moveTodo = (todoId: string) => {
+  const moveTodo = (todoId: number) => {
     setBuckets((prev) => {
       const bucket = prev['0']
       const nextBucket = prev['1']
-      const todo: Todo = bucket.todos.find((t) => t.id === todoId)!!
+      const todo: Todo = bucket.todos.find((t) => t.id === todoId)! //TODO Remove the ! and do a better check
       return {
         ...prev,
         ['0']: {
@@ -69,7 +69,7 @@ export function BucketList() {
         },
         ['1']: {
           ...nextBucket,
-          todos: [...nextBucket.todos, { ...todo, bucketId: '1' }],
+          todos: [...nextBucket.todos, { ...todo, bucketId: 1 }],
         },
       }
     })
@@ -91,6 +91,7 @@ export function BucketList() {
         />
       ))}
       <div>
+        {/* //TODO just for test, remove later */}
         <Button onClick={() => moveTodo(buckets['0'].todos[0].id)}>
           move todo
         </Button>

@@ -7,9 +7,9 @@ import { useState } from 'react'
 
 interface BucketProps {
   bucket: Bucket
-  addTodo: (todo: string, bucketId: string) => void
-  removeTodo: (todoId: string, bucketId: string) => void
-  toggleTodo: (todoId: string, bucketId: string) => void
+  addTodo: (text: string, bucketId: number) => void
+  removeTodo: (todoId: number, bucketId: number) => void
+  toggleTodo: (todoId: number, bucketId: number) => void
 }
 
 export function BucketColumn({

@@ -11,9 +11,9 @@ import { FormEvent, useState } from 'react'
 
 interface AddTodoDialogProps {
   open: boolean
-  bucketId: string
+  bucketId: number,
   setOpen: (open: boolean) => void
-  addTodo: (text: string, bucketId: string) => void
+  addTodo: (text: string, bucketId: number) => void
 }
 
 export default function AddTodoDialog({
