@@ -11,7 +11,7 @@ export function BucketList() {
   const addTodo = (todo: string, bucketId: number) => {
     setBuckets((prev) => {
       const newTodo: Todo = {
-        id: (Math.random() * 100),
+        id: Math.floor(Math.random() * 1000000),
         title: todo,
         completed: false,
         createdAt: new Date().toISOString(),
@@ -60,7 +60,7 @@ export function BucketList() {
     setBuckets((prev) => {
       const bucket = prev['0']
       const nextBucket = prev['1']
-      const todo: Todo = bucket.todos.find((t) => t.id === todoId)!!
+      const todo: Todo = bucket.todos.find((t) => t.id === todoId)! //TODO Remove the ! and do a better check
       return {
         ...prev,
         ['0']: {
@@ -91,6 +91,7 @@ export function BucketList() {
         />
       ))}
       <div>
+        {/* //TODO just for test, remove later */}
         <Button onClick={() => moveTodo(buckets['0'].todos[0].id)}>
           move todo
         </Button>
