@@ -159,7 +159,7 @@ What you'll build:
 - schema.ts with:
   - users table
   - buckets table (id, type, period, status, userId)
-  - todos table (id, title, bucketId, userId, createdAt)
+  - todos table (id, title, bucketId, userId, completed, createdAt)
 
 - Zod schemas for Todo, Bucket, and User types
 - Bucket status enum: active | pending_transition | archived

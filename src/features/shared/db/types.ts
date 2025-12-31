@@ -1,5 +1,6 @@
-import { bucketsTable, todosTable, usersTable } from './schema'
+import { buckets, todos, users } from './schema'
 
-export type BucketDb = typeof bucketsTable.$inferSelect
-export type TodoDb = typeof todosTable.$inferSelect
-export type UserDb = typeof usersTable.$inferSelect
+export type BucketDb = typeof buckets.$inferSelect
+export type TodoDbSelect = typeof todos.$inferSelect
+export type TodoDbInsert = typeof todos.$inferInsert
+export type UserDb = typeof users.$inferSelect
