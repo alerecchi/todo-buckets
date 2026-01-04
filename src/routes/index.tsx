@@ -1,21 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { BucketList } from '@/features/todos/components/Board'
-import { getBuckets } from '@/features/todos/server/buckets'
-import { queryOptions, useSuspenseQuery } from '@tanstack/react-query'
-
-const postQuery = queryOptions({
-  queryKey: ['post'],
-  queryFn: () => getBuckets(),
-})
+import { getBucketsQueryOptions } from '@/features/todos/utils/queries'
 
 export const Route = createFileRoute('/')({
-  loader: ({ context }) => context.queryClient.ensureQueryData(postQuery),
+  loader: ({ context }) =>
+    // Preloading buckets if SSR is enabled
+    context.queryClient.ensureQueryData(getBucketsQueryOptions),
   component: App,
 })
 
 function App() {
-  const { data } = useSuspenseQuery(postQuery)
-  console.log(data)
   return (
     <div>
       <BucketList />

@@ -1,33 +1,32 @@
+import { useState } from 'react'
+import type { FormEvent } from 'react'
 import { Button } from '@/features/shared/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogTitle,
-  DialogHeader,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/features/shared/components/ui/dialog'
 import { Input } from '@/features/shared/components/ui/input'
-import { FormEvent, useState } from 'react'
 
 interface AddTodoDialogProps {
-  open: boolean
-  bucketId: number,
+  isOpen: boolean
   setOpen: (open: boolean) => void
-  addTodo: (text: string, bucketId: number) => void
+  onAddTodo: (text: string) => void
 }
 
 export default function AddTodoDialog({
-  open,
-  bucketId,
+  isOpen,
   setOpen,
-  addTodo,
+  onAddTodo,
 }: AddTodoDialogProps) {
   const [text, setText] = useState('')
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (text.trim()) {
-      addTodo(text, bucketId)
+      onAddTodo(text)
       setText('')
       setOpen(false)
     }
@@ -41,7 +40,7 @@ export default function AddTodoDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>

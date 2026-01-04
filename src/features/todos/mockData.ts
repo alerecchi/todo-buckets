@@ -1,5 +1,5 @@
-import { Todo } from '@/features/todos/types/Todo'
-import { Bucket } from '@/features/todos/types/Bucket'
+import type { Todo } from '@/features/todos/types/Todo'
+import type { Bucket } from '@/features/todos/types/Bucket'
 
 export const todoItem: Todo = {
   id: 1,
@@ -9,7 +9,7 @@ export const todoItem: Todo = {
   bucketId: 0,
 }
 
-function getMockTodoList(startIndex: number, bucketId: number): Todo[] {
+function getMockTodoList(startIndex: number, bucketId: number): Array<Todo> {
   return Array.from({ length: 5 }, (_, i) => ({
     ...todoItem,
     id: i + startIndex,
@@ -22,38 +22,38 @@ function getMockTodoList(startIndex: number, bucketId: number): Todo[] {
 
 export const mockBuckets: Record<string, Bucket> = {
   '0': {
-    id: 0,
+    id: 6,
     name: 'Bucket 0',
     period: 'test',
     type: 'inbox',
     todos: getMockTodoList(0, 0),
   },
   '1': {
-    id: 1,
+    id: 7,
     name: 'Bucket 1',
     period: 'test',
-    type: 'inbox',
+    type: 'yearly',
     todos: getMockTodoList(5, 1),
   },
   '2': {
-    id: 2,
+    id: 8,
     name: 'Bucket 2',
     period: 'test',
-    type: 'inbox',
+    type: 'monthly',
     todos: getMockTodoList(10, 2),
   },
   '3': {
-    id: 3,
+    id: 9,
     name: 'Bucket 3',
     period: 'test',
-    type: 'inbox',
+    type: 'weekly',
     todos: getMockTodoList(15, 3),
   },
   '4': {
-    id: 4,
+    id: 10,
     name: 'Bucket 4',
     period: 'test',
-    type: 'inbox',
+    type: 'daily',
     todos: getMockTodoList(20, 4),
   },
 }

@@ -6,6 +6,6 @@ export default defineConfig({
   schema: './src/features/shared/db/schema.ts',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.DATABASE_URL!, // Validated by zod
+    url: process.env.DATABASE_URL,
   },
 })

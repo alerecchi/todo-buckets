@@ -180,7 +180,7 @@ Architectural decision:
 - Todos reference buckets via bucketId foreign key
 - Status field enables transition workflow tracking
 
-## Phase 4: Server Actions & Data Fetching
+## [DONE] Phase 4: Server Actions & Data Fetching
 
 **Goal**: Replace in-memory state with real database operations.
 
