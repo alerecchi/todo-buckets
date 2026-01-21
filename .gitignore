@@ -54,7 +54,6 @@ web_modules/
 
 # Optional npm cache directory
 .npm
-pnpm-lock.yaml
 
 # Optional eslint cache
 .eslintcache
