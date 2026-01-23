@@ -7,13 +7,13 @@ import {
   timestamp,
 } from 'drizzle-orm/pg-core'
 
-export const usersTable = pgTable('users', {
+export const users = pgTable('users', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   name: varchar({ length: 255 }).notNull(),
 })
 
-export const bucketStatusEnum = pgEnum('bucket_status', ['active', 'archived'])
-export const bucketTypeEnum = pgEnum('bucket_type', [
+export const BucketStatus = pgEnum('bucket_status', ['active', 'archived'])
+export const BucketTypeEnum = pgEnum('bucket_type', [
   'inbox',
   'yearly',
   'monthly',
@@ -21,25 +21,25 @@ export const bucketTypeEnum = pgEnum('bucket_type', [
   'daily',
 ])
 
-export const bucketsTable = pgTable('buckets', {
+export const buckets = pgTable('buckets', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   period: varchar({ length: 20 }).notNull(),
-  type: bucketTypeEnum().notNull(),
-  status: bucketStatusEnum().notNull(),
-  userId: integer("user_id")
-    .references(() => usersTable.id, { onDelete: 'cascade' })
+  type: BucketTypeEnum().notNull(),
+  status: BucketStatus().notNull(),
+  userId: integer('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
 })
 
-export const todosTable = pgTable('todos', {
+export const todos = pgTable('todos', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   title: varchar({ length: 255 }).notNull(),
   completed: boolean().notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  bucketId: integer("bucket_id")
-    .references(() => bucketsTable.id, { onDelete: 'cascade' })
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  bucketId: integer('bucket_id')
+    .references(() => buckets.id, { onDelete: 'cascade' })
     .notNull(),
-  userId: integer("user_id")
-    .references(() => usersTable.id, { onDelete: 'cascade' })
+  userId: integer('user_id')
+    .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
 })

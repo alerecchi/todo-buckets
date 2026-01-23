@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 const envSchema = z.object({
-  DATABASE_URL: z.url(),
+  DATABASE_URL: z.string(),
 })
 
 // Validate server environment

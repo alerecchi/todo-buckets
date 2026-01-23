@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { BucketList } from '@/features/todos/components/Board'
-import { getBuckets } from '@/features/todos/server/getBuckets'
+import { getBuckets } from '@/features/todos/server/buckets'
 import { queryOptions, useSuspenseQuery } from '@tanstack/react-query'
 
 const postQuery = queryOptions({
