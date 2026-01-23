@@ -11,11 +11,7 @@ const config = defineConfig({
       projects: ['./tsconfig.json'],
     }),
     tailwindcss(),
-    tanstackStart({
-      spa: {
-        enabled: true,
-      },
-    }),
+    tanstackStart(),
     viteReact({
       babel: {
         plugins: ['babel-plugin-react-compiler'],

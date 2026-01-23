@@ -9,7 +9,7 @@ import { ReactQueryDevtoolsPanel } from '@tanstack/react-query-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import appCss from '../styles/app.css?url'
-import { QueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   {

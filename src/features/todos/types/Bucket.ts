@@ -1,12 +1,11 @@
 import { z } from 'zod'
-import { TodoSchema } from './Todo'
 
-export const bucketSchema = z.object({
+// TODO right now there is no difference with the db type, see if it's worth keeping this
+export const BucketSchema = z.object({
   id: z.int(),
-  name: z.string(), // TODO remove when ui can infer this
   period: z.string().min(1),
   type: z.enum(['inbox', 'yearly', 'monthly', 'weekly', 'daily']),
-  todos: z.array(TodoSchema),
+  userId: z.string(),
 })
 
-export type Bucket = z.infer<typeof bucketSchema>
+export type Bucket = z.infer<typeof BucketSchema>
