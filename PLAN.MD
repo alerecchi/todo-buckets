@@ -341,31 +341,7 @@ Architectural pattern:
 - Server validates that target buckets exist or creates them
 - Transitions are logged/auditable (optional: add transition history)
 
-## Phase 9: Bucket History & Archive View
-
-**Goal**: Allow users to view archived buckets and their todos (read-only).
-
-What you'll learn:
-
-- Filtered queries (active vs archived)
-- Read-only UI patterns
-- Toggle/tab navigation
-
-What you'll build:
-
-- "Show archived buckets" toggle in UI
-- Server function: getArchivedBuckets(userId, type?)
-- Read-only bucket columns for archived buckets
-- Visual distinction (grayed out, labeled "Archived")
-- Optional: Search/filter archived todos
-
-Key concepts:
-
-- Archived buckets are historical records
-- Users can reference past work but not modify it
-- Useful for retrospectives and tracking completion patterns
-
-## Phase 10: Deployment & CI/CD
+## Phase 9: Deployment & CI/CD
 
 **Goal**: Deploy to Vercel/Netlify and automate deployments via GitHub Actions.
 
@@ -392,7 +368,7 @@ Key concepts:
 - Preview URLs = staging environments per branch
 - Database migrations need careful handling in production
 
-## Phase 11: Polish & Advanced Features
+## Phase 10: Polish & Advanced Features
 
 **Goal**: Add quality-of-life improvements.
 
