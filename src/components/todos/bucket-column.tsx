@@ -1,11 +1,11 @@
 import { Inbox, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { getTodosQueryOptions } from '../utils/queries'
 import TodoCard from './todo-card'
 import AddTodoDialog from './add-todo-dialog'
 import type { Bucket } from '@/lib/types/Bucket'
-import { Button } from '@/features/shared/components/ui/button'
+import { Button } from '@/components/ui/button'
+import { getTodosQueryOptions } from '@/server/queries/todo-queries'
 
 interface BucketProps {
   bucket: Bucket

@@ -1,16 +1,10 @@
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from '@tanstack/react-query'
-import { TODOS_QUERY_KEY, getBucketsQueryOptions } from '../utils/queries'
-import { createTodo, deleteTodo } from '../server/todos'
-import { BucketColumn } from './bucket-column'
 import type { Todo } from '@/lib/types/Todo'
-import { Button } from '@/features/shared/components/ui/button'
-import { useUpdateTodo } from '../hooks/mutations'
-import { Bucket } from '../types/Bucket'
-import { updateTodo } from "@/server/functions/todos"
+import { createTodo, deleteTodo, updateTodo } from '@/server/functions/todos'
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { BucketColumn } from './bucket-column'
+import { getBucketsQueryOptions, TODOS_QUERY_KEY } from '@/server/queries/todo-queries'
+import { Bucket } from '@/lib/types/Bucket'
+import { Button } from '@/components/ui/button'
 
 const BUCKET_TYPE_ORDER = ['inbox', 'yearly', 'monthly', 'weekly', 'daily']
 // Helper for O(1) lookups during sort
@@ -23,26 +17,20 @@ export function BucketList() {
   const queryClient = useQueryClient()
   const { data: bucketList = [] } = useSuspenseQuery(getBucketsQueryOptions)
   //TODO decide where the sorting should be (server, client before cache?, here)
-  const sortedBuckets = bucketList.toSorted(
-    (a: Bucket, b: Bucket) => bucketPriority[a.type] - bucketPriority[b.type],
-  )
+  const sortedBuckets = bucketList.toSorted((a: Bucket, b: Bucket) => bucketPriority[a.type] - bucketPriority[b.type])
 
   //TODO move to mutation hook
   const createMutation = useMutation({
     mutationFn: createTodo,
     onSuccess: (newTodo: Todo) =>
-      queryClient.setQueryData<Array<Todo>>(
-        [TODOS_QUERY_KEY, newTodo.bucketId],
-        (old = []) => [...old, newTodo],
-      ),
+      queryClient.setQueryData<Array<Todo>>([TODOS_QUERY_KEY, newTodo.bucketId], (old = []) => [...old, newTodo]),
   })
 
   const deleteMutation = useMutation({
     mutationFn: deleteTodo,
     onSuccess: ({ todoId, bucketId }) => {
-      queryClient.setQueryData<Array<Todo>>(
-        [TODOS_QUERY_KEY, bucketId],
-        (old = []) => old.filter((todo) => todo.id !== todoId),
+      queryClient.setQueryData<Array<Todo>>([TODOS_QUERY_KEY, bucketId], (old = []) =>
+        old.filter((todo) => todo.id !== todoId),
       )
     },
   })
@@ -50,7 +38,7 @@ export function BucketList() {
   const updateMutation = useUpdateTodo()
 
   return (
-    <div className="container mx-auto grid grid-cols-5 gap-4">
+    <div className='container mx-auto grid grid-cols-5 gap-4'>
       {sortedBuckets.map((bucket: Bucket) => (
         <BucketColumn
           key={bucket.id}
@@ -76,10 +64,7 @@ export function BucketList() {
         {/* //TODO just for test, remove later */}
         <Button
           onClick={() => {
-            const todosFirstBucket = queryClient.getQueryData<Todo[]>([
-              TODOS_QUERY_KEY,
-              bucketList[0].id,
-            ])!
+            const todosFirstBucket = queryClient.getQueryData<Todo[]>([TODOS_QUERY_KEY, bucketList[0].id])!
             updateMutation.mutate({
               data: {
                 id: todosFirstBucket[0].id,
@@ -106,28 +91,19 @@ export function useUpdateTodo() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (variables: UpdateTodoVariables) =>
-      updateTodo({ data: variables.data }),
+    mutationFn: (variables: UpdateTodoVariables) => updateTodo({ data: variables.data }),
     onSuccess: (updatedTodo: Todo, variables: UpdateTodoVariables) => {
       if (variables.oldBucketId) {
         const oldBucketId = variables.oldBucketId
-        queryClient.setQueryData<Todo[]>(
-          [TODOS_QUERY_KEY, oldBucketId],
-          (cache = []) => cache.filter((todo) => todo.id !== updatedTodo.id),
+        queryClient.setQueryData<Todo[]>([TODOS_QUERY_KEY, oldBucketId], (cache = []) =>
+          cache.filter((todo) => todo.id !== updatedTodo.id),
         )
 
         const newBucketId = updatedTodo.bucketId
-        queryClient.setQueryData<Todo[]>(
-          [TODOS_QUERY_KEY, newBucketId],
-          (cache = []) => [...cache, updatedTodo],
-        )
+        queryClient.setQueryData<Todo[]>([TODOS_QUERY_KEY, newBucketId], (cache = []) => [...cache, updatedTodo])
       } else {
-        queryClient.setQueryData<Todo[]>(
-          [TODOS_QUERY_KEY, updatedTodo.bucketId],
-          (cache = []) =>
-            cache.map((todo) =>
-              todo.id === updatedTodo.id ? updatedTodo : todo,
-            ),
+        queryClient.setQueryData<Todo[]>([TODOS_QUERY_KEY, updatedTodo.bucketId], (cache = []) =>
+          cache.map((todo) => (todo.id === updatedTodo.id ? updatedTodo : todo)),
         )
       }
     },
