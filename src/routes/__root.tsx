@@ -44,6 +44,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        {/* TODO body fullscreen vertically even with small content */}
         {/* <Header /> */}
         {children}
         <TanStackDevtools

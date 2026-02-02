@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { BucketList } from '@/features/todos/components/Board'
+import { BucketList } from '@/components/todos/board'
 import { getBucketsQueryOptions } from '@/server/queries/todo-queries'
 
 export const Route = createFileRoute('/')({
