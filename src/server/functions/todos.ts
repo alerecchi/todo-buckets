@@ -1,9 +1,10 @@
-import { createServerFn } from '@tanstack/react-start'
-import z from 'zod'
-import { eq } from 'drizzle-orm'
-import type { TodoDbInsert } from '@/server/db/types'
 import { db } from '@/server/db/client'
 import { todos } from '@/server/db/schema/schema'
+import type { TodoDbInsert } from '@/server/db/types'
+import { authRequiredMiddleware } from '@/server/middlewares/auth-middleware'
+import { createServerFn } from '@tanstack/react-start'
+import { eq } from 'drizzle-orm'
+import z from 'zod'
 
 const AddTodoInput = z.object({
   title: z.string().min(1),
@@ -29,6 +30,7 @@ const DeleteTodoInput = z.object({
 })
 
 export const createTodo = createServerFn({ method: 'POST' })
+  .middleware([authRequiredMiddleware])
   .inputValidator(AddTodoInput)
   .handler(async ({ data }) => {
     const newTodo: TodoDbInsert = {
@@ -36,19 +38,21 @@ export const createTodo = createServerFn({ method: 'POST' })
       bucketId: data.bucketId,
       completed: false,
       createdAt: new Date(),
-      userId: 4, // TODO change with actual user id
+      userId: '4', // TODO change with actual user id
     }
     //TODO Before inserting a new todo, verify that The target bucket exists and The bucket belongs to the authenticated user (when auth is implemented)
     return (await db.insert(todos).values(newTodo).returning())[0]
   })
 
 export const getTodos = createServerFn()
+  .middleware([authRequiredMiddleware])
   .inputValidator(GetTodosInput)
   .handler(async ({ data }) => {
     return db.select().from(todos).where(eq(todos.bucketId, data.bucketId)) // TODO add user check
   })
 
 export const updateTodo = createServerFn({ method: 'POST' })
+  .middleware([authRequiredMiddleware])
   .inputValidator(UpdateTodoInput)
   .handler(async ({ data }) => {
     // TODO possible extra checks
@@ -69,14 +73,12 @@ export const updateTodo = createServerFn({ method: 'POST' })
   })
 
 export const deleteTodo = createServerFn({ method: 'POST' })
+  .middleware([authRequiredMiddleware])
   .inputValidator(DeleteTodoInput)
   .handler(async ({ data }) => {
     // TODO Add ownership validation before deletion.
     // TODO Update/delete operations return undefined for non-existent IDs.
     return (
-      await db
-        .delete(todos)
-        .where(eq(todos.id, data.id))
-        .returning({ todoId: todos.id, bucketId: todos.bucketId })
+      await db.delete(todos).where(eq(todos.id, data.id)).returning({ todoId: todos.id, bucketId: todos.bucketId })
     )[0]
   })

@@ -28,6 +28,7 @@ export default function LoginForm() {
           email: value.email,
           password: value.password,
           callbackURL: '/', // TODO check this redirect based on the github decision
+          // TODO check callback url, code rabbit says that it's for email confirmation and not post login redirect?
           rememberMe: false, //TODO for now for testing
         },
         {
