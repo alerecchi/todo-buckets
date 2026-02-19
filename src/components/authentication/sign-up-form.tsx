@@ -34,7 +34,7 @@ export function SignUpForm() {
       return result
     },
     onSuccess: () => {
-      router.navigate({ to: '/' })
+      router.navigate({ to: '/' }) //TODO I need a registration successful page (either full page or component) that says now verify the email
     },
     onError: (error: Error) => {
       //TODO proper error management

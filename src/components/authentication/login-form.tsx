@@ -27,7 +27,7 @@ export default function LoginForm() {
         {
           email: value.email,
           password: value.password,
-          callbackURL: '/',
+          callbackURL: '/', // TODO check this redirect based on the github decision
           rememberMe: false, //TODO for now for testing
         },
         {

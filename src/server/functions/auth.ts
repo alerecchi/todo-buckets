@@ -9,6 +9,10 @@ export const getUserSession = createServerFn({ method: 'GET' }).handler(async ()
     return null
   }
 
-  const userSession = await auth.api.getSession({ headers: request.headers })
-  return userSession
+  try {
+    return await auth.api.getSession({ headers: request.headers })
+  } catch(error) {
+    console.log(error) // TODO add some logging / tracing mechanism
+    return null
+  }
 })

@@ -11,7 +11,8 @@ import appCss from '../styles/app.css?url'
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async () => {
     const session = await getUserSession()
-    return { session }
+    console.log(session)
+    return { session: session?.session, user: session?.user }
   },
   head: () => ({
     meta: [
