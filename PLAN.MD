@@ -22,7 +22,8 @@ A todo app where tasks flow through time-based buckets, moving from abstract fut
   - Keep old bucket archived for reference
 - Progressive refinement: Users gradually move todos from abstract ("tackle this year") to concrete ("do this today")
 - Drag-and-drop: Simple UI to move tasks between buckets
-- Multi-user: Basic auth so each user has their own isolated todo universe
+- Multi-user: Basic auth so each user has their own isolated todo universe, each user has its profile and settings page
+- User can see previous buckets and statistics in a Retrospective page
 
 Happy Path Example:
 

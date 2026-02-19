@@ -27,7 +27,7 @@ export default function AddTodoDialog({ isOpen, setOpen, onAddTodo }: AddTodoDia
     }
     setOpen(open)
   }
-
+  //autoComplete="off" for form fields (is it the suggestions?)
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className='sm:max-w-[425px]'>

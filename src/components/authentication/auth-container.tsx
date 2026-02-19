@@ -4,19 +4,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useState } from 'react'
 
-export default function AuthContainer() {
-  //TODO enum or restrictive type for tab id
-  const [activeTab, setActiveTab] = useState('login')
+export enum AuthTab {
+  LOGIN = 'login',
+  SIGNUP = 'signup',
+}
+
+export type AuthContainerProps = {
+  initialTab: AuthTab
+}
+
+export default function AuthContainer({ initialTab }: AuthContainerProps) {
+  const [activeTab, setActiveTab] = useState(initialTab)
+
+  const title = activeTab == AuthTab.SIGNUP ? 'Create Account' : 'Welcome Back'
+  const subtitle =
+    activeTab == AuthTab.SIGNUP ? 'Start managing your TODOs effectively' : 'Manage your TODOs effectively'
 
   return (
     // TODO min-h-screen probably doesn't go here but in the body and here like h-full?
     // TODO animation height when changing tabs?
     <div className='min-h-screen flex items-center justify-center'>
       <Card className='w-full max-w-md shadow-xl'>
-        {/* TODO make this dynamic */}
         <CardHeader>
-          <CardTitle>Create Account</CardTitle>
-          <CardDescription>Start managing your TODOs effectively</CardDescription>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{subtitle}</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs
@@ -26,13 +37,13 @@ export default function AuthContainer() {
             }}
           >
             <TabsList>
-              <TabsTrigger value='login'>Login</TabsTrigger>
-              <TabsTrigger value='signup'>Sign Up</TabsTrigger>
+              <TabsTrigger value={AuthTab.LOGIN}>Login</TabsTrigger>
+              <TabsTrigger value={AuthTab.SIGNUP}>Sign Up</TabsTrigger>
             </TabsList>
-            <TabsContent value='login'>
+            <TabsContent value={AuthTab.LOGIN}>
               <LoginForm />
             </TabsContent>
-            <TabsContent value='signup'>
+            <TabsContent value={AuthTab.SIGNUP}>
               <SignUpForm />
             </TabsContent>
           </Tabs>
