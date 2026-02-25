@@ -12,7 +12,7 @@ export function redirectIfAuthenticated(user: { emailVerified: boolean } | undef
 
 export function redirectIfNotAuthenticated(user: { emailVerified: boolean } | undefined, redirectLink: string) {
   if (!user) {
-    throw redirect({ to: '/login', search: {redirect: redirectLink} })
+    throw redirect({ to: '/login', search: {redirect: redirectLink} }) // TODO sanatize redirect link (e.g. verify it's an internal link)
   } else if (!user.emailVerified) {
     throw redirect({ to: '/email_confirmation' })
   }

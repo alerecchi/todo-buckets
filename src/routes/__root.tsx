@@ -3,16 +3,15 @@ import { HeadContent, Scripts, createRootRouteWithContext } from '@tanstack/reac
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import { formDevtoolsPlugin } from '@tanstack/react-form-devtools'
 
-import { getUserSession } from '@/server/functions/auth'
-import type { QueryClient } from '@tanstack/react-query'
+import { userSessionQuery } from '@/lib/queries/auth'
+import { type QueryClient } from '@tanstack/react-query'
 import appCss from '../styles/app.css?url'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  beforeLoad: async () => {
-    // TODO try authClient.getSession() but maybe it's worse considering that before load runs on SSR as well?
-    const session = await getUserSession()
-    console.log(session)
+  beforeLoad: async ({ context }) => {
+    const session = await context.queryClient.fetchQuery(userSessionQuery.options())
     return { session: session?.session, user: session?.user }
   },
   head: () => ({
@@ -45,7 +44,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {/* TODO body fullscreen vertically even with small content */}
+        {/* TODO body fullscreen vertically even with small content? or should it be in components / Layout component? */}
         {/* <Header /> */}
         {children}
         <TanStackDevtools

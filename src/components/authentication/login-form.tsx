@@ -1,46 +1,65 @@
-import { Button } from '@/components/ui/button'
-import { Field, FieldGroup, FieldLabel, FieldSet } from '@/components/ui/field'
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
+import { FieldGroup, FieldSet } from '@/components/ui/field'
 import { authClient } from '@/lib/auth-client'
-import { useForm } from '@tanstack/react-form-start'
-import { Eye, EyeOff, Lock, Mail } from 'lucide-react'
-import { useState } from 'react'
+import { userSessionQuery } from '@/lib/queries/auth'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
+import { Mail } from 'lucide-react'
+import z from 'zod'
+import { useAppForm } from './form'
 
-// TODO avoid duplication with signup form
-enum PasswordInputType {
-  PASSWORD = 'password',
-  TEXT = 'text',
-}
+export default function Login() {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
-export default function LoginForm() {
-  //TODO enum / "restricted" type for passwordType?
-  const [passwordInputType, setPasswordInputType] = useState('password')
-  // TODO login function
+  const { mutateAsync: signInMutation } = useMutation({
+    mutationKey: userSessionQuery.key,
+    mutationFn: async (data: { email: string; password: string }) =>
+      await authClient.signIn.email({
+        email: data.email,
+        password: data.password,
+      }),
+    onSuccess: () => {
+      //TODO see if I need this considering that I'm already saying that the auth cache changes (maybe that already triggers enough refreshes)
+      queryClient.resetQueries()
+    },
+  })
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: {
       email: '',
       password: '',
     },
-    onSubmit: async ({ value }) => {
-      await authClient.signIn.email(
-        {
-          email: value.email,
-          password: value.password,
-          callbackURL: '/', // TODO check this redirect based on the github decision
-          // TODO check callback url, code rabbit says that it's for email confirmation and not post login redirect?
-          rememberMe: false, //TODO for now for testing
-        },
-        {
-          // TODO add callbacks for error and success (if the redirect is not enough)
-        },
-      )
+    /* A weird behavior from Tanstack Form on how to manage errors from the server (e.g. user already exist) is 
+    to check them in a validator instead of in the onSubmit function. The onSubmit then becames just the happy 
+    path https://github.com/TanStack/form/discussions/623  */
+    validators: {
+      onSubmitAsync: async ({ value: data }) => {
+        const result = await signInMutation(data)
+        if (result.error) {
+          console.log(result.error)
+          if (result.error.code == 'INVALID_EMAIL_OR_PASSWORD') {
+            return { form: 'Invalid Email or Password' }
+          }
+          return { form: 'There was a problem with your login, please refresh the page and try again' }
+        }
+        return undefined //Everything went well and the user is logged in
+      },
     },
+    onSubmit: async () => {
+      navigate({ to: '/board' })
+      //TODO navigate based on redirect param
+    },
+    canSubmitWhenInvalid: true,
   })
+
+  const formId = 'login-form'
+
+  const emailValidator = z.email('Please enter a valid email address').trim()
+  const passwordValidator = z.string().min(1, 'Password is required').min(8, 'Password must be at least 8 characters')
 
   return (
     <form
-      id='login-form'
+      id={formId}
       onSubmit={(e) => {
         e.preventDefault()
         e.stopPropagation()
@@ -48,88 +67,33 @@ export default function LoginForm() {
       }}
     >
       <FieldSet>
-        <FieldGroup>
-          <form.Field
+        <FieldGroup className='gap-4'>
+          <form.AppField
             name='email'
-            children={(field) => {
-              return (
-                <Field>
-                  <FieldLabel htmlFor={field.name}>Email Address</FieldLabel>
-                  <InputGroup>
-                    <InputGroupInput
-                      id={field.name}
-                      placeholder='name@example.com'
-                      type='email'
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                    <InputGroupAddon>
-                      <Mail />
-                    </InputGroupAddon>
-                  </InputGroup>
-                </Field>
-              )
+            validators={{
+              onBlur: emailValidator,
+              onSubmit: emailValidator,
             }}
+            children={(field) => (
+              <field.TextInput label='Email Address' placeholder='email@example.com' type='email' icon={<Mail />} />
+            )}
           />
-          <form.Field
+          <form.AppField
             name='password'
-            children={(field) => {
-              return (
-                <Field>
-                  <FieldLabel htmlFor={field.name}>Password</FieldLabel>
-                  <InputGroup>
-                    <InputGroupInput
-                      id={field.name}
-                      type={passwordInputType}
-                      placeholder='Enter your password'
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                    <InputGroupAddon>
-                      <Lock />
-                    </InputGroupAddon>
-                    <InputGroupAddon align='inline-end'>
-                      {passwordInputType == PasswordInputType.PASSWORD ? (
-                        <InputGroupButton
-                          aria-label='Show'
-                          title='Show'
-                          className='cursor-pointer'
-                          onClick={() => {
-                            setPasswordInputType(PasswordInputType.TEXT)
-                          }}
-                        >
-                          <EyeOff />
-                        </InputGroupButton>
-                      ) : (
-                        <InputGroupButton
-                          aria-label='Hide'
-                          title='Hide'
-                          className='cursor-pointer'
-                          onClick={() => {
-                            setPasswordInputType(PasswordInputType.PASSWORD)
-                          }}
-                        >
-                          <Eye />
-                        </InputGroupButton>
-                        // TODO Forgot password
-                      )}
-                    </InputGroupAddon>
-                  </InputGroup>
-                </Field>
-              )
+            validators={{
+              onBlur: passwordValidator,
+              onSubmit: passwordValidator,
             }}
+            children={(field) => <field.PasswordInput label='Password' forgotLink />}
           />
-
-          <Field>
-            {/* TODO prevent multiple submissions */}
-            <Button className='cursor-pointer' type='submit' form='login-form'>
-              Login
-            </Button>
-          </Field>
+          <form.AppForm>
+            <form.FormErrorAlert />
+          </form.AppForm>
+          <form.AppForm>
+            <form.SubmitButton text='Login' formId={formId} />
+          </form.AppForm>
         </FieldGroup>
       </FieldSet>
-      {/* TODO CSS adjustments (icon color, margins and paddings) */}
-      {/* TODO add "Don't have an account? Sign Up div" */}
     </form>
   )
 }
