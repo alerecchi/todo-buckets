@@ -10,6 +10,7 @@ import appCss from '../styles/app.css?url'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async () => {
+    // TODO try authClient.getSession() but maybe it's worse considering that before load runs on SSR as well?
     const session = await getUserSession()
     console.log(session)
     return { session: session?.session, user: session?.user }
