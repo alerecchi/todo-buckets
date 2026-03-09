@@ -1,21 +1,9 @@
-import {
-  boolean,
-  integer,
-  pgEnum,
-  pgTable,
-  text,
-  timestamp,
-} from 'drizzle-orm/pg-core'
-import { users } from "./auth-schema"
+import { boolean, integer, pgEnum, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+
+import { users } from './auth-schema'
 
 export const BucketStatus = pgEnum('bucket_status', ['active', 'archived'])
-export const BucketTypeEnum = pgEnum('bucket_type', [
-  'inbox',
-  'yearly',
-  'monthly',
-  'weekly',
-  'daily',
-])
+export const BucketTypeEnum = pgEnum('bucket_type', ['inbox', 'yearly', 'monthly', 'weekly', 'daily'])
 
 export const buckets = pgTable('buckets', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),

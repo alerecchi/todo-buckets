@@ -10,4 +10,4 @@ export const BucketSchema = z.object({
 
 export type Bucket = z.infer<typeof BucketSchema>
 
-//TODO think if this folder should be top level, and what should be inside. (all types? server?, db?, just client?)
+// TODO think if this folder should be top level, and what should be inside. (all types? server?, db?, just client?)

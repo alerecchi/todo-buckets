@@ -62,7 +62,7 @@ import { Link } from '@tanstack/react-router'
 Then anywhere in your JSX you can use it like so:
 
 ```tsx
-<Link to="/about">About</Link>
+<Link to='/about'>About</Link>
 ```
 
 This will create a link that will navigate to the `/about` route.
@@ -86,8 +86,8 @@ export const Route = createRootRoute({
     <>
       <header>
         <nav>
-          <Link to="/">Home</Link>
-          <Link to="/about">About</Link>
+          <Link to='/'>Home</Link>
+          <Link to='/about'>About</Link>
         </nav>
       </header>
       <Outlet />
@@ -175,7 +175,7 @@ const rootRoute = createRootRoute({
   component: () => (
     <>
       <Outlet />
-      <ReactQueryDevtools buttonPosition="top-right" />
+      <ReactQueryDevtools buttonPosition='top-right' />
       <TanStackRouterDevtools />
     </>
   ),
@@ -238,9 +238,7 @@ function App() {
   const count = useStore(countStore)
   return (
     <div>
-      <button onClick={() => countStore.setState((n) => n + 1)}>
-        Increment - {count}
-      </button>
+      <button onClick={() => countStore.setState((n) => n + 1)}>Increment - {count}</button>
     </div>
   )
 }
@@ -271,9 +269,7 @@ function App() {
 
   return (
     <div>
-      <button onClick={() => countStore.setState((n) => n + 1)}>
-        Increment - {count}
-      </button>
+      <button onClick={() => countStore.setState((n) => n + 1)}>Increment - {count}</button>
       <div>Doubled - {doubledCount}</div>
     </div>
   )

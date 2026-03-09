@@ -1,11 +1,12 @@
-import { useAppForm } from '@/components/authentication/form'
-import { FieldGroup, FieldSet } from '@/components/ui/field'
-import { authClient } from '@/lib/auth-client'
-import { userSessionQuery } from '@/lib/queries/auth'
 import { useMutation } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
 import { Mail, User } from 'lucide-react'
 import z from 'zod'
+
+import { useAppForm } from '@/components/authentication/form'
+import { FieldGroup, FieldSet } from '@/components/ui/field'
+import { authClient } from '@/lib/auth-client'
+import { userSessionQuery } from '@/lib/queries/auth'
 
 type RegistrationInput = {
   name: string
@@ -13,7 +14,7 @@ type RegistrationInput = {
   password: string
 }
 
-// TODO extract this somewhere else
+// TODO extract this somewhere else or simplify if it's only used here
 // Customize the libraries error (including multi-language): https://better-auth.com/docs/concepts/client#error-codes
 export type AuthErrorTypes = Partial<
   Record<
@@ -64,10 +65,11 @@ export function getBetterAuthErrorMessage(
 export function SignUpForm() {
   const router = useRouter()
 
-  /* TODO evaluate this: I'm keeping this mutation for now because it automatically 
+  /* TODO evaluate this: I'm keeping this mutation for now because it automatically
     says to the cache that I'm changing this key, but I could technically clear the 
     cache manually as well in the onSubmit (and save the extra indirection). It would
     make more sense if there was some extra logic */
+  // TODO do I need a manual resetQueries like in the login form?
   const { mutateAsync: registerMutation } = useMutation({
     mutationKey: userSessionQuery.key,
     mutationFn: async (data: RegistrationInput) => await authClient.signUp.email(data),
@@ -80,7 +82,7 @@ export function SignUpForm() {
       password: '',
       confirm_password: '',
     },
-    /* A weird behavior from Tanstack Form on how to manage errors from the server (e.g. user already exist) is 
+    /* A weird behavior from Tanstack Form on how to manage errors from the server (e.g. user already exist) is
     to check them in a validator instead of in the onSubmit function. The onSubmit then becames just the happy 
     path https://github.com/TanStack/form/discussions/623  */
     validators: {
@@ -93,11 +95,11 @@ export function SignUpForm() {
             'There was a problem with your account creation, please refresh the page and try again',
           )
         }
-        return undefined //Everything went well and the user is registered
+        return undefined // Everything went well and the user is registered
       },
     },
     onSubmit: () => {
-      router.navigate({ to: '/' }) //TODO I need a registration successful page (either full page or component) that says now verify the email
+      router.navigate({ to: '/email-confirmation', search: { from: 'signup' } })
     },
   })
   const formId = 'sign-up-form'
@@ -113,7 +115,6 @@ export function SignUpForm() {
     return undefined
   }
 
-  //TODO fields error management
   return (
     <form
       id={formId}

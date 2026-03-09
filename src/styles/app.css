@@ -110,11 +110,11 @@
   --sidebar-ring: oklch(0.72 0.18 260);
 
   /* Charts  */
-  --chart-1: oklch(0.72 0.18 260); 
-  --chart-2: oklch(0.78 0.15 70); 
-  --chart-3: oklch(0.75 0.14 150); 
+  --chart-1: oklch(0.72 0.18 260);
+  --chart-2: oklch(0.78 0.15 70);
+  --chart-3: oklch(0.75 0.14 150);
   --chart-4: oklch(0.68 0.16 300);
-  --chart-5: oklch(0.7 0.16 340); 
+  --chart-5: oklch(0.7 0.16 340);
 
   --radius: 0.75rem;
 }
@@ -132,6 +132,7 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-foreground: var(--foreground);
   --color-input: var(--input);
   --color-muted-foreground: var(--muted-foreground);
@@ -166,7 +167,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background font-sans text-foreground;
   }
   html {
     @apply font-sans;

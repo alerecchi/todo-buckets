@@ -214,7 +214,7 @@ Architectural pattern:
 - Keep business logic in server functions; UI components stay thin
 - Server functions validate bucket states before mutations
 
-## Phase 5: Authentication with BetterAuth
+## [DONE] Phase 5: Authentication with BetterAuth
 
 **Goal**: Add user sign-up, login, and session management.
 
@@ -236,7 +236,7 @@ What you'll build:
 Key concepts:
 
 - Sessions are server-side state (like Android's SharedPreferences + backend tokens)
-- BetterAuth handles cookie management and session validatio
+- BetterAuth handles cookie management and session validation
 - Middleware runs before routes (like Interceptors in OkHttp)
 
 Architectural decision:

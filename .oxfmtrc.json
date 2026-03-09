@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": ["src/routeTree.gen.ts"],
+  "jsxSingleQuote": true,
+  "printWidth": 120,
+  "semi": false,
+  "singleQuote": true,
+  "sortImports": {},
+  "sortTailwindcss": {
+    "stylesheet": "./src/styles/app.css",
+    "functions": ["clsx", "cn"],
+    "preserveWhitespace": true
+  },
+  "tabWidth": 2,
+  "trailingComma": "all"
+}
