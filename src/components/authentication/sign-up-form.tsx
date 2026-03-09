@@ -1,12 +1,11 @@
-import { Button } from '@/components/ui/button'
-import { Field, FieldGroup, FieldLabel, FieldSet } from '@/components/ui/field'
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
+import { useAppForm } from '@/components/authentication/form'
+import { FieldGroup, FieldSet } from '@/components/ui/field'
 import { authClient } from '@/lib/auth-client'
-import { useForm } from '@tanstack/react-form-start'
+import { userSessionQuery } from '@/lib/queries/auth'
 import { useMutation } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
-import { Eye, EyeOff, Lock, Mail, User } from 'lucide-react'
-import { useState } from 'react'
+import { Mail, User } from 'lucide-react'
+import z from 'zod'
 
 type RegistrationInput = {
   name: string
@@ -14,163 +13,159 @@ type RegistrationInput = {
   password: string
 }
 
-enum PasswordInputType {
-  PASSWORD = 'password',
-  TEXT = 'text',
+// TODO extract this somewhere else
+// Customize the libraries error (including multi-language): https://better-auth.com/docs/concepts/client#error-codes
+export type AuthErrorTypes = Partial<
+  Record<
+    keyof typeof authClient.$ERROR_CODES,
+    {
+      message: string
+      field: string
+    }
+  >
+>
+// TODO extract this somewhere else
+const signupErrorTypes = {
+  USER_ALREADY_EXISTS: {
+    message: 'User already exists',
+    field: 'email',
+  },
+  USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: {
+    message: 'Email already exists',
+    field: 'email',
+  },
+  PASSWORD_TOO_LONG: {
+    message: 'Password is too long',
+    field: 'password',
+  },
+  PASSWORD_TOO_SHORT: {
+    message: 'Password is too short',
+    field: 'password',
+  },
+} satisfies AuthErrorTypes
+
+// TODO extract this somewhere else
+export function getBetterAuthErrorMessage(
+  code: string | undefined,
+  authErrorMessages: AuthErrorTypes,
+  defaultMessage: string,
+) {
+  const error = authErrorMessages[code as keyof typeof authErrorMessages]
+  if (error) {
+    return {
+      fields: {
+        [error.field]: error.message,
+      },
+    }
+  }
+  return { form: defaultMessage }
 }
-// TODO study react form
+
 export function SignUpForm() {
-  // TODO separate the signup and login into separate cards / pages
   const router = useRouter()
-  const [passwordInputType, setPasswordInputType] = useState(PasswordInputType.PASSWORD)
 
-  const register = useMutation({
-    mutationFn: async (data: RegistrationInput) => {
-      const result = await authClient.signUp.email(data)
-
-      if (result.error) {
-        throw result.error
-      }
-      return result
-    },
-    onSuccess: () => {
-      router.navigate({ to: '/' }) //TODO I need a registration successful page (either full page or component) that says now verify the email
-    },
-    onError: (error: Error) => {
-      //TODO proper error management
-      console.log(error)
-    },
+  /* TODO evaluate this: I'm keeping this mutation for now because it automatically 
+    says to the cache that I'm changing this key, but I could technically clear the 
+    cache manually as well in the onSubmit (and save the extra indirection). It would
+    make more sense if there was some extra logic */
+  const { mutateAsync: registerMutation } = useMutation({
+    mutationKey: userSessionQuery.key,
+    mutationFn: async (data: RegistrationInput) => await authClient.signUp.email(data),
   })
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: {
       name: '',
       email: '',
       password: '',
-    }, //TODO add validators
-    // TODO https://github.com/TanStack/form/discussions/623 for field errors from server
-    onSubmit: async ({ value }) => {
-      register.mutate(value)
+      confirm_password: '',
+    },
+    /* A weird behavior from Tanstack Form on how to manage errors from the server (e.g. user already exist) is 
+    to check them in a validator instead of in the onSubmit function. The onSubmit then becames just the happy 
+    path https://github.com/TanStack/form/discussions/623  */
+    validators: {
+      onSubmitAsync: async ({ value: data }) => {
+        const result = await registerMutation({ name: data.name, email: data.email, password: data.password })
+        if (result.error) {
+          return getBetterAuthErrorMessage(
+            result.error.code,
+            signupErrorTypes,
+            'There was a problem with your account creation, please refresh the page and try again',
+          )
+        }
+        return undefined //Everything went well and the user is registered
+      },
+    },
+    onSubmit: () => {
+      router.navigate({ to: '/' }) //TODO I need a registration successful page (either full page or component) that says now verify the email
     },
   })
+  const formId = 'sign-up-form'
+
+  const nameValidator = z.string().min(1, 'Name is required')
+  const emailValidator = z.email('Please enter a valid email address').trim()
+  const passwordValidator = z.string().min(1, 'Password is required').min(8, 'Password must be at least 8 characters')
+  const confirmPasswordValidator = ({ value, fieldApi }: { value: string; fieldApi: any }) => {
+    const password = fieldApi.form.getFieldValue('password')
+    if (value !== password) {
+      return 'Passwords do not match'
+    }
+    return undefined
+  }
+
   //TODO fields error management
   return (
     <form
-      id='sign-up-form'
+      id={formId}
       onSubmit={(e) => {
         e.preventDefault()
         form.handleSubmit()
       }}
     >
       <FieldSet>
-        <FieldGroup>
-          <form.Field
+        <FieldGroup className='gap-4'>
+          <form.AppField
             name='name'
-            children={(field) => {
-              return (
-                <Field>
-                  <FieldLabel htmlFor={field.name}>Full Name</FieldLabel>
-                  <InputGroup>
-                    <InputGroupInput
-                      id={field.name}
-                      name={field.name}
-                      placeholder='John Doe'
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                    <InputGroupAddon>
-                      <User />
-                    </InputGroupAddon>
-                  </InputGroup>
-                </Field>
-              )
+            validators={{
+              onBlur: nameValidator,
+              onSubmit: nameValidator,
             }}
+            children={(field) => <field.TextInput label='Name' placeholder='John Doe' type='text' icon={<User />} />}
           />
-
-          <form.Field
+          <form.AppField
             name='email'
-            children={(field) => {
-              return (
-                <Field>
-                  <FieldLabel htmlFor={field.name}>Email Address</FieldLabel>
-                  <InputGroup>
-                    <InputGroupInput
-                      id={field.name}
-                      name={field.name}
-                      placeholder='name@example.com'
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      type='email'
-                    />
-                    <InputGroupAddon>
-                      <Mail />
-                    </InputGroupAddon>
-                  </InputGroup>
-                </Field>
-              )
+            validators={{
+              onBlur: emailValidator,
+              onSubmit: emailValidator,
             }}
+            children={(field) => (
+              <field.TextInput label='Email Address' placeholder='name@example.com' type='email' icon={<Mail />} />
+            )}
           />
-
-          <form.Field
+          <form.AppField
             name='password'
-            children={(field) => {
-              return (
-                <Field>
-                  <FieldLabel htmlFor={field.name}>Password</FieldLabel>
-                  <InputGroup>
-                    <InputGroupInput
-                      id={field.name}
-                      name={field.name}
-                      type={passwordInputType}
-                      placeholder='Create a password'
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                    <InputGroupAddon>
-                      <Lock />
-                    </InputGroupAddon>
-                    <InputGroupAddon align='inline-end'>
-                      {passwordInputType == PasswordInputType.PASSWORD ? (
-                        <InputGroupButton
-                          aria-label='Show'
-                          title='Show'
-                          className='cursor-pointer'
-                          onClick={() => {
-                            setPasswordInputType(PasswordInputType.TEXT)
-                          }}
-                        >
-                          <EyeOff />
-                        </InputGroupButton>
-                      ) : (
-                        <InputGroupButton
-                          aria-label='Hide'
-                          title='Hide'
-                          className='cursor-pointer'
-                          onClick={() => {
-                            setPasswordInputType(PasswordInputType.PASSWORD)
-                          }}
-                        >
-                          <Eye />
-                        </InputGroupButton>
-                      )}
-                    </InputGroupAddon>
-                  </InputGroup>
-                  {/* TODO password requirements validation */}
-                  {/* TODO required fields */}
-                  {/* TODO CSS adjustments (icon color, margins and paddings) */}
-                  {/* TODO add "already have an account? Login" */}
-                  {/* TODO confirm password */}
-                </Field>
-              )
+            validators={{
+              onBlur: passwordValidator,
+              onSubmit: passwordValidator,
             }}
+            children={(field) => <field.PasswordInput label='Password' />}
           />
-
-          <Field>
-            {/* TODO isLoading state for button */}
-            <Button className='cursor-pointer' type='submit' form='sign-up-form'>
-              Create Account
-            </Button>
-          </Field>
+          <form.AppField
+            name='confirm_password'
+            validators={{
+              onBlur: confirmPasswordValidator,
+              onSubmit: confirmPasswordValidator,
+              onChangeListenTo: ['password'],
+              onChange: confirmPasswordValidator,
+            }}
+            children={(field) => <field.PasswordInput label='Confirm Your Password' />}
+          />
+          <form.AppForm>
+            <form.FormErrorAlert />
+          </form.AppForm>
+          <form.AppForm>
+            <form.SubmitButton text='Create Account' formId={formId} />
+          </form.AppForm>
         </FieldGroup>
       </FieldSet>
     </form>

@@ -1,4 +1,4 @@
-import { redirectIfNotAuthenticated } from '@/utils/auth'
+import { redirectIfNotAuthenticated } from '@/lib/utils/auth'
 import { createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_authenticated/board')({

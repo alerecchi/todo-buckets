@@ -1,4 +1,5 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
+import { Loader, LoaderCircle } from 'lucide-react'
 
 export const Route = createFileRoute('/_auth-pages/email_confirmation')({
   beforeLoad: ({ context }) => {
@@ -9,5 +10,10 @@ export const Route = createFileRoute('/_auth-pages/email_confirmation')({
 
 function RouteComponent() {
   // TODO implement email confirmation
-  return <div>Hello "/_auth-pages/email_confirmation"!</div>
+  return (
+    <div>
+      Hello "/_auth-pages/email_confirmation"!
+      
+    </div>
+  )
 }
