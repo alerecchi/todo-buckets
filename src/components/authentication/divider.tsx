@@ -5,7 +5,7 @@ export default function Divider({ children }: { children: React.ReactNode }) {
     <div className='relative'>
       <Separator />
       <div className='absolute inset-0 flex items-center justify-center'>
-        <span className='bg-card px-2 text-muted-foreground text-xs uppercase tracking-wide'>{children}</span>
+        <span className='bg-card px-2 text-xs tracking-wide text-muted-foreground uppercase'>{children}</span>
       </div>
     </div>
   )

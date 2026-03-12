@@ -1,10 +1,11 @@
+import { Link } from '@tanstack/react-router'
+import { Eye, EyeOff, Lock } from 'lucide-react'
+import { useState } from 'react'
+
 import { useFieldContext } from '@/components/authentication/form'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { getErrorMessage } from '@/lib/utils/form'
-import { Link } from '@tanstack/react-router'
-import { Eye, EyeOff, Lock } from 'lucide-react'
-import { useState } from 'react'
 
 enum PasswordInputType {
   PASSWORD = 'password',
@@ -24,7 +25,7 @@ export default function PasswordInput({ label, forgotLink = false }: PasswordInp
       <div className='flex items-center justify-between'>
         <FieldLabel htmlFor={field.name}>{label}</FieldLabel>
         {forgotLink && (
-          <Link to='.' className='inline-block text-sm font-medium underline-offset-4 hover:underline text-primary'>
+          <Link to='/reset-password' className='inline-block text-sm font-medium text-primary underline-offset-4 hover:underline'>
             Forgot your password?
           </Link>
         )}

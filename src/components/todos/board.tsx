@@ -1,10 +1,12 @@
-import type { Todo } from '@/lib/types/Todo'
-import { createTodo, deleteTodo, updateTodo } from '@/server/functions/todos'
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+
 import { BucketColumn } from './bucket-column'
-import { getBucketsQueryOptions, TODOS_QUERY_KEY } from '@/server/queries/todo-queries'
-import { Bucket } from '@/lib/types/Bucket'
+import type { Bucket } from '@/lib/types/Bucket'
+import type { Todo } from '@/lib/types/Todo'
 import { Button } from '@/components/ui/button'
+import { createTodo, deleteTodo, updateTodo } from '@/server/functions/todos'
+import { TODOS_QUERY_KEY, getBucketsQueryOptions } from '@/server/queries/todo-queries'
+
 
 const BUCKET_TYPE_ORDER = ['inbox', 'yearly', 'monthly', 'weekly', 'daily']
 // Helper for O(1) lookups during sort
@@ -16,10 +18,10 @@ const bucketPriority: Record<string, number> = BUCKET_TYPE_ORDER.reduce(
 export function BucketList() {
   const queryClient = useQueryClient()
   const { data: bucketList = [] } = useSuspenseQuery(getBucketsQueryOptions)
-  //TODO decide where the sorting should be (server, client before cache?, here)
+  // TODO decide where the sorting should be (server, client before cache?, here)
   const sortedBuckets = bucketList.toSorted((a: Bucket, b: Bucket) => bucketPriority[a.type] - bucketPriority[b.type])
 
-  //TODO move to mutation hook
+  // TODO move to mutation hook
   const createMutation = useMutation({
     mutationFn: createTodo,
     onSuccess: (newTodo: Todo) =>
@@ -64,7 +66,7 @@ export function BucketList() {
         {/* //TODO just for test, remove later */}
         <Button
           onClick={() => {
-            const todosFirstBucket = queryClient.getQueryData<Todo[]>([TODOS_QUERY_KEY, bucketList[0].id])!
+            const todosFirstBucket = queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, bucketList[0].id])!
             updateMutation.mutate({
               data: {
                 id: todosFirstBucket[0].id,
@@ -81,7 +83,7 @@ export function BucketList() {
   )
 }
 
-//TODO fix this
+// TODO fix this
 type UpdateTodoVariables = {
   data: Parameters<typeof updateTodo>[0]['data']
   oldBucketId?: number
@@ -95,14 +97,14 @@ export function useUpdateTodo() {
     onSuccess: (updatedTodo: Todo, variables: UpdateTodoVariables) => {
       if (variables.oldBucketId) {
         const oldBucketId = variables.oldBucketId
-        queryClient.setQueryData<Todo[]>([TODOS_QUERY_KEY, oldBucketId], (cache = []) =>
+        queryClient.setQueryData<Array<Todo>>([TODOS_QUERY_KEY, oldBucketId], (cache = []) =>
           cache.filter((todo) => todo.id !== updatedTodo.id),
         )
 
         const newBucketId = updatedTodo.bucketId
-        queryClient.setQueryData<Todo[]>([TODOS_QUERY_KEY, newBucketId], (cache = []) => [...cache, updatedTodo])
+        queryClient.setQueryData<Array<Todo>>([TODOS_QUERY_KEY, newBucketId], (cache = []) => [...cache, updatedTodo])
       } else {
-        queryClient.setQueryData<Todo[]>([TODOS_QUERY_KEY, updatedTodo.bucketId], (cache = []) =>
+        queryClient.setQueryData<Array<Todo>>([TODOS_QUERY_KEY, updatedTodo.bucketId], (cache = []) =>
           cache.map((todo) => (todo.id === updatedTodo.id ? updatedTodo : todo)),
         )
       }

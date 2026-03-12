@@ -1,10 +1,11 @@
-import { db } from '@/server/db/client'
-import { todos } from '@/server/db/schema/schema'
-import type { TodoDbInsert } from '@/server/db/types'
-import { authRequiredMiddleware } from '@/server/middlewares/auth-middleware'
 import { createServerFn } from '@tanstack/react-start'
 import { eq } from 'drizzle-orm'
 import z from 'zod'
+
+import type { TodoDbInsert } from '@/server/db/types'
+import { db } from '@/server/db/client'
+import { todos } from '@/server/db/schema/schema'
+import { authRequiredMiddleware } from '@/server/middlewares/auth-middleware'
 
 const AddTodoInput = z.object({
   title: z.string().min(1),
@@ -40,7 +41,7 @@ export const createTodo = createServerFn({ method: 'POST' })
       createdAt: new Date(),
       userId: '4', // TODO change with actual user id
     }
-    //TODO Before inserting a new todo, verify that The target bucket exists and The bucket belongs to the authenticated user (when auth is implemented)
+    // TODO Before inserting a new todo, verify that The target bucket exists and The bucket belongs to the authenticated user (when auth is implemented)
     return (await db.insert(todos).values(newTodo).returning())[0]
   })
 

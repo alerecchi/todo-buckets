@@ -20,16 +20,16 @@ export default function AuthContainer({ activeTab }: AuthContainerProps) {
     activeTab === AuthTab.SIGNUP ? 'Start managing your TODOs effectively' : 'Manage your TODOs effectively'
 
   return (
-    <Card className='shadow-xl p-6 sm:p-8'>
+    <Card className='p-6 shadow-xl sm:p-8'>
       <CardHeader className='text-center'>
-        <CardTitle className='text-2xl mb-2 font-bold'>{title}</CardTitle>
+        <CardTitle className='mb-2 text-2xl font-bold'>{title}</CardTitle>
         <CardDescription className='text-sm text-muted-foreground'>{subtitle}</CardDescription>
       </CardHeader>
       <CardContent>
         <AuthSelector authTab={activeTab} />
         {activeTab === AuthTab.LOGIN ? <LoginForm /> : <SignUpForm />}
       </CardContent>
-      <CardFooter className='flex-col gap-6 items-stretch'>
+      <CardFooter className='flex-col items-stretch gap-6'>
         <Divider>Or continue with</Divider>
         <SocialLogins />
       </CardFooter>

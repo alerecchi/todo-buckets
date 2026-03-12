@@ -1,8 +1,9 @@
+import type { ReactNode } from 'react'
+
 import { useFieldContext } from '@/components/authentication/form'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { getErrorMessage } from '@/lib/utils/form'
-import { ReactNode } from 'react'
 
 type TextInputProps = {
   label: string

@@ -1,10 +1,12 @@
-import { FieldGroup, FieldSet } from '@/components/ui/field'
-import { authClient } from '@/lib/auth-client'
-import { userSessionQuery } from '@/lib/queries/auth'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { Mail } from 'lucide-react'
 import z from 'zod'
+
+import { FieldGroup, FieldSet } from '@/components/ui/field'
+import { authClient } from '@/lib/auth-client'
+import { userSessionQuery } from '@/lib/queries/auth'
+
 import { useAppForm } from './form'
 
 export default function Login() {
@@ -19,41 +21,46 @@ export default function Login() {
         password: data.password,
       }),
     onSuccess: () => {
-      //TODO see if I need this considering that I'm already saying that the auth cache changes (maybe that already triggers enough refreshes)
+      // TODO see if I need this considering that I'm already saying that the auth cache changes (maybe that already triggers enough refreshes)
       queryClient.resetQueries()
     },
   })
 
+  // TODO Block disposable (“throwaway”) email providers (e.g. mailinator.com, 10minutemail.com).
   const form = useAppForm({
     defaultValues: {
       email: '',
       password: '',
     },
-    /* A weird behavior from Tanstack Form on how to manage errors from the server (e.g. user already exist) is 
+    /* A weird behavior from Tanstack Form on how to manage errors from the server (e.g. user already exist) is
     to check them in a validator instead of in the onSubmit function. The onSubmit then becames just the happy 
     path https://github.com/TanStack/form/discussions/623  */
     validators: {
       onSubmitAsync: async ({ value: data }) => {
         const result = await signInMutation(data)
+        console.log(result)
         if (result.error) {
-          console.log(result.error)
-          if (result.error.code == 'INVALID_EMAIL_OR_PASSWORD') {
+          if (result.error.code === 'INVALID_EMAIL_OR_PASSWORD') {
             return { form: 'Invalid Email or Password' }
+          } else if (result.error.code === 'EMAIL_NOT_VERIFIED') {
+            //Since I have the page I'm using it, also a simple error would have been enough
+            throw navigate({ to: '/email-confirmation' })
           }
           return { form: 'There was a problem with your login, please refresh the page and try again' }
         }
-        return undefined //Everything went well and the user is logged in
+        return undefined // Everything went well and the user is logged in
       },
     },
-    onSubmit: async () => {
+    onSubmit: () => {
       navigate({ to: '/board' })
-      //TODO navigate based on redirect param
+      // TODO navigate based on redirect param
     },
     canSubmitWhenInvalid: true,
   })
 
   const formId = 'login-form'
 
+  // TODO extract validators (maybe when moving to feature based arch)
   const emailValidator = z.email('Please enter a valid email address').trim()
   const passwordValidator = z.string().min(1, 'Password is required').min(8, 'Password must be at least 8 characters')
 

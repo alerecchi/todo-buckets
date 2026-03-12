@@ -1,5 +1,6 @@
-import { getUserSession } from '@/server/functions/auth'
 import { createMiddleware } from '@tanstack/react-start'
+
+import { getUserSession } from '@/server/functions/auth'
 
 export const authRequiredMiddleware = createMiddleware().server(async ({ next }) => {
   const session = await getUserSession()

@@ -7,7 +7,7 @@ type AuthSelectorProps = {
 
 export default function AuthSelector({ authTab }: AuthSelectorProps) {
   return (
-    <div className='grid grid-cols-2 gap-2 mb-8 bg-muted p-1 rounded-lg text-muted-foreground'>
+    <div className='mb-8 grid grid-cols-2 gap-2 rounded-lg bg-muted p-1 text-muted-foreground'>
       <ButtonLink to='/login' size='lg' variant={authTab === AuthTab.LOGIN ? 'outline' : 'ghost'}>
         Login
       </ButtonLink>

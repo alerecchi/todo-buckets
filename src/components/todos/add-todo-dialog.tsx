@@ -1,7 +1,9 @@
+import { useState } from 'react'
+import type { FormEvent } from 'react'
+
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { FormEvent, useState } from 'react'
 
 interface AddTodoDialogProps {
   isOpen: boolean
@@ -27,7 +29,7 @@ export default function AddTodoDialog({ isOpen, setOpen, onAddTodo }: AddTodoDia
     }
     setOpen(open)
   }
-  //autoComplete="off" for form fields (is it the suggestions?)
+  // autoComplete="off" for form fields (is it the suggestions?)
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className='sm:max-w-[425px]'>
@@ -35,7 +37,7 @@ export default function AddTodoDialog({ isOpen, setOpen, onAddTodo }: AddTodoDia
           <DialogHeader>
             <DialogTitle>Add a new Todo</DialogTitle>
           </DialogHeader>
-          <div className='grid gap-4 my-4'>
+          <div className='my-4 grid gap-4'>
             <div className='grid gap-2'>
               <Input
                 onChange={(e) => {

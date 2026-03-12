@@ -1,5 +1,6 @@
-import { getUserSession } from '@/server/functions/auth'
 import { queryOptions } from '@tanstack/react-query'
+
+import { getUserSession } from '@/server/functions/auth'
 
 // TODO I don't like that I have many files called "auth", I probably need to differentiate them other than the folder path
 

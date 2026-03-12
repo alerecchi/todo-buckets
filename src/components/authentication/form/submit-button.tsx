@@ -1,8 +1,9 @@
+import { useStore } from '@tanstack/react-form'
+
 import { useFormContext } from '@/components/authentication/form'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Spinner } from '@/components/ui/spinner'
-import { useStore } from '@tanstack/react-form'
 
 type SubmitButtonProps = {
   text: string
