@@ -6,7 +6,7 @@ import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 
 import appCss from '../styles/app.css?url'
 import type { QueryClient } from '@tanstack/react-query'
-import { userSessionQuery } from '@/lib/queries/auth'
+import { userSessionQuery } from '@/features/authentication/queries/user-session'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ context }) => {
@@ -43,7 +43,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {/* TODO body fullscreen vertically even with small content? or should it be in components / Layout component? */}
+        {/* TODO: body fullscreen vertically even with small content? or should it be in components / Layout component? */}
         {/* <Header /> */}
         {children}
         <TanStackDevtools

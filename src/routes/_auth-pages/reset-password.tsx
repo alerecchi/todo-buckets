@@ -1,7 +1,6 @@
+import ResetPasswordContainer from '@features/authentication/components/reset-password-container'
 import { createFileRoute } from '@tanstack/react-router'
 import z from 'zod'
-
-import ResetPasswordContainer from '@/components/authentication/reset-password-container'
 
 const passwordResetSchema = z.object({
   token: z.string().optional(),

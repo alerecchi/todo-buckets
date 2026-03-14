@@ -7,7 +7,7 @@
 
 :root {
   /* Background & Foreground */
-  --background: oklch(0.98 0.005 240);
+  --background: oklch(0.97 0.002 260);
   --foreground: oklch(0.19 0.04 235);
 
   /* Cards & Surfaces */
@@ -19,7 +19,7 @@
   --primary-foreground: oklch(1 0 0);
 
   /* Secondary */
-  --secondary: oklch(0.96 0.01 240);
+  --secondary: oklch(0.94 0.01 155);
   --secondary-foreground: oklch(0.4 0.02 240);
 
   /* Muted */

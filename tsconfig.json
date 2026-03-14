@@ -1,11 +1,5 @@
 {
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "eslint.config.js",
-    "prettier.config.js",
-    "vite.config.js"
-  ],
+  "include": ["**/*.ts", "**/*.tsx", "eslint.config.js", "vite.config.js"],
 
   "compilerOptions": {
     "target": "ES2023",
@@ -30,7 +24,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@server/*": ["./src/server/*"]
+      "@server/*": ["./src/server/*"],
+      "@features/*": ["./src/features/*"],
+      "@shared/*": ["./src/features/shared/*"]
     }
   }
 }

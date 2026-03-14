@@ -2,9 +2,9 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { betterAuth } from 'better-auth/minimal'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
 
+import { db } from './db/client'
 import { sendEmailConfirmation, sendResetPassword } from '@/server/email/sender'
 
-import { db } from './db/client'
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -40,4 +40,4 @@ export const auth = betterAuth({
   experimental: { joins: true },
   plugins: [tanstackStartCookies()],
 })
-// TODO from better auth docs: Avoid awaiting the email sending to prevent timing attacks. On serverless platforms, use waitUntil or similar to ensure the email is sent.
+// TODO: from better auth docs: Avoid awaiting the email sending to prevent timing attacks. On serverless platforms, use waitUntil or similar to ensure the email is sent.
