@@ -1,3 +1,4 @@
+import { relations } from 'drizzle-orm'
 import { boolean, integer, pgEnum, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 
 import { users } from './auth-schema'
@@ -27,3 +28,14 @@ export const todos = pgTable('todos', {
     .references(() => users.id, { onDelete: 'cascade' })
     .notNull(),
 })
+
+export const todosRelations = relations(todos, ({ one }) => ({
+  bucket: one(buckets, {
+    fields: [todos.bucketId],
+    references: [buckets.id],
+  }),
+}))
+
+export const bucketsRelations = relations(buckets, ({ many }) => ({
+  todos: many(todos),
+}))

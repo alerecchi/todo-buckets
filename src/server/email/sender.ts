@@ -22,11 +22,11 @@ const resend = new Resend(requiredEnv('RESEND_API_KEY'))
 const from = requiredEnv('EMAIL_FROM')
 const appName = requiredEnv('APP_NAME')
 
-// TODO change the implementation with SES in production, remove resend dependency
+// TODO: change the implementation with SES in production, remove resend dependency
 export async function sendEmail(input: SendEmailInput) {
   const result = await resend.emails.send({
     from: from,
-    to: "delivered@resend.dev", //TODO change this to actual email input.to
+    to: 'delivered@resend.dev', // TODO: change this to actual email input.to
     subject: input.subject,
     text: input.text,
     html: input.html,

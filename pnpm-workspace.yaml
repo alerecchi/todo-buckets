@@ -6,3 +6,5 @@ onlyBuiltDependencies:
   - esbuild
   - msw
   - prisma
+
+minimumReleaseAge: 10080

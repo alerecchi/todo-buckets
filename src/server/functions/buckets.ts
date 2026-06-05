@@ -7,7 +7,7 @@ import { authRequiredMiddleware } from '@/server/middlewares/auth-middleware'
 export const getBuckets = createServerFn()
   .middleware([authRequiredMiddleware])
   .handler(async () => {
-    return db.select().from(buckets) // TODO where userId
+    return db.select().from(buckets) // TODO: where userId
   })
 
-// TODO think if the parent folder should be called functions / fn / api / apis
+// TODO: think if the parent folder should be called functions / fn / api / apis

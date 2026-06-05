@@ -1,13 +1,14 @@
 import { z } from 'zod'
 
-// TODO right now there is no difference with the db type, see if it's worth keeping this
-export const BucketSchema = z.object({
+const BucketTypeSchema = z.enum(['inbox', 'yearly', 'monthly', 'weekly', 'daily'])
+// TODO: right now there is no difference with the db type, see if it's worth keeping this
+const BucketSchema = z.object({
   id: z.int(),
   period: z.string().min(1),
-  type: z.enum(['inbox', 'yearly', 'monthly', 'weekly', 'daily']),
+  type: BucketTypeSchema,
   userId: z.string(),
 })
 
 export type Bucket = z.infer<typeof BucketSchema>
-
-// TODO think if this folder should be top level, and what should be inside. (all types? server?, db?, just client?)
+export type BucketType = z.infer<typeof BucketTypeSchema>
+// TODO: think if this folder should be top level, and what should be inside. (all types? server?, db?, just client?)

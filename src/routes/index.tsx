@@ -1,16 +1,17 @@
+import { Button } from '@shared/components/ui/button'
 import { createFileRoute } from '@tanstack/react-router'
 
-import { Button } from '@/components/ui/button'
-import { authClient } from '@/lib/auth-client'
+import { authClient } from '@/features/authentication/auth-client'
+import { redirectIfAuthenticated } from '@/features/authentication/utils/redirects'
+import { getBucketsQueryOptions } from '@/features/board/queries/todo-queries'
 
 export const Route = createFileRoute('/')({
   beforeLoad: ({ context }) => {
-    // redirectIfAuthenticated(context.user) TODO re-enable before merging
+    redirectIfAuthenticated(context.user)
   },
-  /* loader: ({ context }) =>
+  loader: ({ context }) =>
     // Preloading buckets if SSR is enabled
-    context.queryClient.ensureQueryData(getBucketsQueryOptions), */
-  // TODO Check why this crashes the app
+    context.queryClient.ensureQueryData(getBucketsQueryOptions),
   component: App,
 })
 

@@ -1,16 +1,16 @@
 import { createServerFn } from '@tanstack/react-start'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import z from 'zod'
 
-import type { TodoDbInsert } from '@/server/db/types'
 import { db } from '@/server/db/client'
-import { todos } from '@/server/db/schema/schema'
+import { buckets, todos } from '@/server/db/schema/schema'
+import type { TodoDbInsert } from '@/server/db/types'
 import { authRequiredMiddleware } from '@/server/middlewares/auth-middleware'
+import { errorResponse } from '@/server/utils'
 
 const AddTodoInput = z.object({
   title: z.string().min(1),
   bucketId: z.number(),
-  // TODO add user
 })
 
 const GetTodosInput = z.object({
@@ -23,7 +23,6 @@ const UpdateTodoInput = z.object({
   bucketId: z.int().optional(),
   completed: z.boolean().optional(),
   createdAt: z.date().optional(),
-  userId: z.int().optional(), // TODO Not optional when adding auth or maybe remove it because it can be taken from session
 })
 
 const DeleteTodoInput = z.object({
@@ -33,52 +32,86 @@ const DeleteTodoInput = z.object({
 export const createTodo = createServerFn({ method: 'POST' })
   .middleware([authRequiredMiddleware])
   .inputValidator(AddTodoInput)
-  .handler(async ({ data }) => {
-    const newTodo: TodoDbInsert = {
+  .handler(async ({ data, context }) => {
+    const user = context.session.user
+
+    const bucket = await db.query.buckets.findFirst({ where: eq(buckets.userId, user.id) })
+    if (!bucket) {
+      throw errorResponse(500, "Bucket doesn't belong to this user")
+    }
+    if (bucket.status == 'archived') {
+      throw errorResponse(500, 'Bucket is archived')
+    }
+
+    const todoToAdd: TodoDbInsert = {
       title: data.title,
       bucketId: data.bucketId,
       completed: false,
       createdAt: new Date(),
-      userId: '4', // TODO change with actual user id
+      userId: user.id,
     }
-    // TODO Before inserting a new todo, verify that The target bucket exists and The bucket belongs to the authenticated user (when auth is implemented)
-    return (await db.insert(todos).values(newTodo).returning())[0]
+    const [newTodo] = await db.insert(todos).values(todoToAdd).returning()
+    return newTodo
   })
 
 export const getTodos = createServerFn()
   .middleware([authRequiredMiddleware])
   .inputValidator(GetTodosInput)
-  .handler(async ({ data }) => {
-    return db.select().from(todos).where(eq(todos.bucketId, data.bucketId)) // TODO add user check
+  .handler(async ({ data, context }) => {
+    const user = context.session.user
+    const bucket = db.query.buckets.findFirst({
+      where: and(eq(buckets.id, data.bucketId), eq(buckets.userId, user.id)),
+    })
+    if (!bucket) {
+      throw errorResponse(500, 'Bucket does not exist or does not belong to this user')
+    }
+    return db.select().from(todos).where(eq(todos.bucketId, data.bucketId))
   })
 
 export const updateTodo = createServerFn({ method: 'POST' })
   .middleware([authRequiredMiddleware])
   .inputValidator(UpdateTodoInput)
-  .handler(async ({ data }) => {
-    // TODO possible extra checks
-    // 1. Verify todo exists and belongs to user
-    // 2. If moving to a different bucket, validate target bucket
-    // 3. Business rule: Cannot move to archived or pending transition buckets
+  .handler(async ({ data, context }) => {
+    const userId = context.session.user.id
+    const { id: todoId, ...updates } = data
 
-    // TODO Update/delete operations return undefined for non-existent IDs.
+    // Verify todo exists and belongs to user
+    const existingTodo = await db.query.todos.findFirst({
+      where: and(eq(todos.id, data.id), eq(todos.userId, userId)),
+      with: { bucket: true },
+    })
 
-    const { id, ...updates } = data
-    return (
-      await db
-        .update(todos)
-        .set({ ...updates })
-        .where(eq(todos.id, id))
-        .returning()
-    )[0]
+    if (!existingTodo) {
+      throw errorResponse(500, 'Todo not found or unauthorized change')
+    }
+
+    if (existingTodo.bucket.status === 'archived') {
+      throw errorResponse(500, 'Attempting to update a Todo in an archived bucket')
+    }
+
+    // If changing buckets, verify the new bucket exists
+    if (data.bucketId && data.bucketId !== existingTodo.bucketId) {
+      const newBucket = await db.query.buckets.findFirst({ where: eq(buckets.id, data.bucketId) })
+      if (!newBucket || newBucket.status === 'archived') {
+        throw errorResponse(500, 'Attempting to move Todo to a bucket that does not exist or is archived')
+      }
+    }
+
+    const [updatedTodo] = await db
+      .update(todos)
+      .set({ ...updates })
+      .where(eq(todos.id, todoId))
+      .returning()
+
+    return updatedTodo
   })
 
 export const deleteTodo = createServerFn({ method: 'POST' })
   .middleware([authRequiredMiddleware])
   .inputValidator(DeleteTodoInput)
   .handler(async ({ data }) => {
-    // TODO Add ownership validation before deletion.
-    // TODO Update/delete operations return undefined for non-existent IDs.
+    // TODO: Add ownership validation before deletion.
+    // TODO: Update/delete operations return undefined for non-existent IDs.
     return (
       await db.delete(todos).where(eq(todos.id, data.id)).returning({ todoId: todos.id, bucketId: todos.bucketId })
     )[0]

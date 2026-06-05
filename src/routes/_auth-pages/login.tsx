@@ -1,7 +1,7 @@
+import AuthContainer, { AuthTab } from '@features/authentication/components/auth-container'
 import { createFileRoute } from '@tanstack/react-router'
 
-import AuthContainer, { AuthTab } from '@/components/authentication/auth-container'
-import { redirectIfAuthenticated } from '@/lib/utils/auth'
+import { redirectIfAuthenticated } from '@/features/authentication/utils/redirects'
 
 export const Route = createFileRoute('/_auth-pages/login')({
   beforeLoad: ({ context }) => {
