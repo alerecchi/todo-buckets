@@ -1,6 +1,3 @@
-ignoredBuiltDependencies:
-  - unrs-resolver
-
 onlyBuiltDependencies:
   - '@prisma/engines'
   - esbuild
@@ -8,3 +5,10 @@ onlyBuiltDependencies:
   - prisma
 
 minimumReleaseAge: 10080
+
+allowBuilds:
+  '@prisma/engines': true
+  esbuild: true
+  msw: true
+  prisma: true
+  unrs-resolver: true

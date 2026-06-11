@@ -16,6 +16,7 @@ This repository is a VERY EARLY WIP. Larger maintainability proposals are welcom
 The current stack is:
 
 - TanStack Start is the base as a full-stack React framework;
+- React compiler enabled;
 - TanStack Query for data fetching;
 - TanStack Form for forms;
 - Better Auth for authentication;
@@ -46,7 +47,7 @@ The project has an opinionated structure that is feature-based but does not colo
 - `lib/` Shared code between client and server;
 - `features/` Client-side features;
 - `features/shared` Features shared code (custom components, shadcn/ui components, hooks, utils etc.);
-- `features/featureX` All the files related to a feature, organized in subfolders if needed, for example `/components`, `/hooks`, `/queries`, `lib` (for pure logic), `types` etc;
+- `features/featureX` All the files related to a feature, organized in sub folders if needed, for example `/components`, `/hooks`, `/queries`, `lib` (for pure logic), `types` etc;
 - `server/` all server code; client code should only import from `server/functions`;
 - `server/db` DB schemas, migration and configuration;
 - `server/functions` Server functions, organized in features files or sub folders when the single file gets too big;
@@ -57,9 +58,8 @@ When folders contain code that is exported for other modules/components an `inde
 
 ## Task Readiness For Code Changes
 
-- `pnpm run format` must pass before considering code changes completed.
+- `pnpm run format` and `pnpm test` must pass before considering code changes completed.
 - `cr --agent` must be invoked and the comments addressed before considering code changes completed. If CodeRabbit is unavailable or unauthenticated, state that clearly in the final response.
-- Tests are not expected at the moment.
 
 ## Agent skills
 

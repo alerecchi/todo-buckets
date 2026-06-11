@@ -1,12 +1,12 @@
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import type { QueryClient } from '@tanstack/react-query'
 import { ReactQueryDevtoolsPanel } from '@tanstack/react-query-devtools'
 import { HeadContent, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 
+import { userSessionQuery } from '@/features/authentication/queries/user-session'
 
 import appCss from '../styles/app.css?url'
-import type { QueryClient } from '@tanstack/react-query'
-import { userSessionQuery } from '@/features/authentication/queries/user-session'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ context }) => {

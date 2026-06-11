@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { eq, and } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import z from 'zod'
 
 import { db } from '@/server/db/client'
@@ -59,7 +59,7 @@ export const getTodos = createServerFn()
   .inputValidator(GetTodosInput)
   .handler(async ({ data, context }) => {
     const user = context.session.user
-    const bucket = db.query.buckets.findFirst({
+    const bucket = await db.query.buckets.findFirst({
       where: and(eq(buckets.id, data.bucketId), eq(buckets.userId, user.id)),
     })
     if (!bucket) {
