@@ -5,14 +5,14 @@ import type { ReactNode } from 'react'
 
 import { getErrorMessage } from '@/features/shared/utils/form'
 
-type TextInputProps = {
+type AuthTextInputProps = {
   label: string
   placeholder: string
   type: 'email' | 'text'
   icon: ReactNode
 }
 
-export default function TextInput({ label, placeholder, type, icon }: TextInputProps) {
+export default function AuthTextInput({ label, placeholder, type, icon }: AuthTextInputProps) {
   const field = useFieldContext<string>()
   return (
     <Field className='gap-1'>

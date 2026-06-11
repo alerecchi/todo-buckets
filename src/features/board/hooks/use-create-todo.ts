@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { TODOS_QUERY_KEY } from '@/features/board/queries/todo-queries'
+import { TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
 import type { Todo } from '@/lib/types/Todo'
 import { createTodo } from '@/server/functions/todos'
 

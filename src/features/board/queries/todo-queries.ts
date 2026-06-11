@@ -1,10 +1,8 @@
 import { queryOptions } from '@tanstack/react-query'
 
+import { BUCKETS_QUERY_KEY, TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
 import { getBuckets } from '@/server/functions/buckets'
 import { getTodos } from '@/server/functions/todos'
-
-export const BUCKETS_QUERY_KEY = 'buckets'
-export const TODOS_QUERY_KEY = 'todos'
 
 export const getBucketsQueryOptions = queryOptions({
   queryKey: [BUCKETS_QUERY_KEY],

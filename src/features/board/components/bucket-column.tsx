@@ -11,10 +11,11 @@ import type { Bucket, BucketType } from '@/lib/types/Bucket'
 
 interface BucketProps {
   bucket: Bucket
+  buckets: Array<Bucket>
 }
 
 // TODO order for todos
-export function BucketColumn({ bucket }: BucketProps) {
+export function BucketColumn({ bucket, buckets }: BucketProps) {
   const { data: todoList = [] } = useSuspenseQuery(getTodosQueryOptions(bucket.id))
   const { icon: Icon, textColor, bgColor } = bucketStyles[bucket.type]
 
@@ -26,7 +27,7 @@ export function BucketColumn({ bucket }: BucketProps) {
         </div>
         <span className={cn('block text-xl font-semibold capitalize', textColor)}>{bucket.type}</span>
         <Badge className={cn(textColor, bgColor)}>{todoList.length}</Badge>
-        <AddTodoButton bucketId={bucket.id} />
+        <AddTodoButton bucketId={bucket.id} buckets={buckets} />
       </div>
       <div className='flex flex-auto flex-col rounded-lg bg-secondary'>
         {todoList.map((todoItem) => (

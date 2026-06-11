@@ -55,7 +55,6 @@ export default function Login() {
       navigate({ to: '/board' })
       // TODO: navigate based on redirect param
     },
-    canSubmitWhenInvalid: true,
   })
 
   const formId = 'login-form'
@@ -82,7 +81,7 @@ export default function Login() {
               onSubmit: emailValidator,
             }}
             children={(field) => (
-              <field.TextInput label='Email Address' placeholder='email@example.com' type='email' icon={<Mail />} />
+              <field.AuthTextInput label='Email Address' placeholder='email@example.com' type='email' icon={<Mail />} />
             )}
           />
           <form.AppField

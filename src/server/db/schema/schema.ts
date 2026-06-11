@@ -19,6 +19,7 @@ export const buckets = pgTable('buckets', {
 export const todos = pgTable('todos', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   title: text().notNull(),
+  description: text().notNull(),
   completed: boolean().notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   bucketId: integer('bucket_id')
