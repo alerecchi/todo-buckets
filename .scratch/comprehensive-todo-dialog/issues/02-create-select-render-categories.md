@@ -1,6 +1,6 @@
 # Create, select, and render Categories
 
-Status: ready-for-agent
+Status: done
 
 ## What to build
 

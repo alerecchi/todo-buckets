@@ -10,6 +10,13 @@ import {
 } from './todos.core'
 import type { TodoRepository } from './todos.core'
 
+const ownedCategory = {
+  colorKey: 'blue',
+  id: 5,
+  name: 'home admin',
+  userId: 'user-1',
+} as const
+
 const activeBucket = {
   id: 2,
   period: '2026-06-11',
@@ -28,6 +35,8 @@ const otherActiveBucket = {
 const existingTodo = {
   bucket: activeBucket,
   bucketId: activeBucket.id,
+  category: null,
+  categoryId: null,
   completed: false,
   createdAt: new Date('2026-06-10T08:00:00.000Z'),
   description: '',
@@ -40,6 +49,7 @@ const createRepository = (overrides: Partial<TodoRepository> = {}): TodoReposito
   createTodo: vi.fn((todoToCreate) => Promise.resolve({ id: 10, ...todoToCreate })),
   deleteTodo: vi.fn(),
   findOwnedActiveBucket: vi.fn(() => Promise.resolve(activeBucket)),
+  findOwnedCategory: vi.fn(() => Promise.resolve(ownedCategory)),
   findOwnedTodoWithBucket: vi.fn(),
   getTodosByBucketForUser: vi.fn(() => Promise.resolve([])),
   updateTodo: vi.fn(),
@@ -65,6 +75,7 @@ describe('todo server behavior', () => {
     expect(repository.findOwnedActiveBucket).toHaveBeenCalledWith(activeBucket.userId, activeBucket.id)
     expect(repository.createTodo).toHaveBeenCalledWith({
       bucketId: activeBucket.id,
+      categoryId: null,
       completed: false,
       createdAt,
       description: 'Details to remember',
@@ -94,6 +105,65 @@ describe('todo server behavior', () => {
     })
 
     expect(repository.createTodo).toHaveBeenCalledWith(expect.objectContaining({ description: '' }))
+  })
+
+  it('creates todos with an owned Category selected', async () => {
+    const repository = createRepository()
+
+    await createTodoForUser({
+      data: CreateTodoInput.parse({
+        bucketId: activeBucket.id,
+        categoryId: ownedCategory.id,
+        title: 'Pay rent',
+      }),
+      repository,
+      userId: activeBucket.userId,
+    })
+
+    expect(repository.findOwnedCategory).toHaveBeenCalledWith(activeBucket.userId, ownedCategory.id)
+    expect(repository.createTodo).toHaveBeenCalledWith(expect.objectContaining({ categoryId: ownedCategory.id }))
+  })
+
+  it("rejects creating a Todo with another user's Category", async () => {
+    const repository = createRepository({
+      findOwnedCategory: vi.fn(() => Promise.resolve(undefined)),
+    })
+
+    await expect(
+      createTodoForUser({
+        data: {
+          bucketId: activeBucket.id,
+          categoryId: ownedCategory.id,
+          title: 'Pay rent',
+        },
+        repository,
+        userId: activeBucket.userId,
+      }),
+    ).rejects.toHaveProperty('status', 404)
+
+    expect(repository.findOwnedCategory).toHaveBeenCalledWith(activeBucket.userId, ownedCategory.id)
+    expect(repository.createTodo).not.toHaveBeenCalled()
+  })
+
+  it("rejects updating a Todo to another user's Category", async () => {
+    const repository = createRepository({
+      findOwnedCategory: vi.fn(() => Promise.resolve(undefined)),
+      findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(existingTodo)),
+    })
+
+    await expect(
+      updateTodoForUser({
+        data: {
+          categoryId: ownedCategory.id,
+          id: existingTodo.id,
+        },
+        repository,
+        userId: activeBucket.userId,
+      }),
+    ).rejects.toHaveProperty('status', 404)
+
+    expect(repository.findOwnedCategory).toHaveBeenCalledWith(activeBucket.userId, ownedCategory.id)
+    expect(repository.updateTodo).not.toHaveBeenCalled()
   })
 
   it('rejects blank titles at the server function validation boundary', () => {
