@@ -1,6 +1,6 @@
 # Rename and recolor Categories
 
-Status: ready-for-agent
+Status: done
 
 ## What to build
 

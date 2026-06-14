@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { CreateCategoryInput, createCategoryForUser, listCategoriesForUser } from './categories.core'
+import {
+  CreateCategoryInput,
+  UpdateCategoryInput,
+  createCategoryForUser,
+  listCategoriesForUser,
+  updateCategoryForUser,
+} from './categories.core'
 import type { CategoryRepository } from './categories.core'
 
 const existingCategory = {
@@ -12,6 +18,15 @@ const existingCategory = {
 
 const createRepository = (overrides: Partial<CategoryRepository> = {}): CategoryRepository => ({
   createCategory: vi.fn((categoryToCreate) => Promise.resolve({ id: 8, ...categoryToCreate })),
+  findCategoryByName: vi.fn(() => Promise.resolve(undefined)),
+  updateCategory: vi.fn((categoryId, userId, updates) =>
+    Promise.resolve({
+      ...existingCategory,
+      ...updates,
+      id: categoryId,
+      userId,
+    }),
+  ),
   listCategoriesForUser: vi.fn(() => Promise.resolve([])),
   ...overrides,
 })
@@ -78,6 +93,23 @@ describe('category server behavior', () => {
     ).toBe(false)
   })
 
+  it('rejects invalid Category update input at the validation boundary', () => {
+    expect(
+      UpdateCategoryInput.safeParse({
+        colorKey: 'legacy-color',
+        id: existingCategory.id,
+        name: 'Home admin',
+      }).success,
+    ).toBe(false)
+    expect(
+      UpdateCategoryInput.safeParse({
+        colorKey: 'blue',
+        id: existingCategory.id,
+        name: '   ',
+      }).success,
+    ).toBe(false)
+  })
+
   it('lists Categories for the current user only', async () => {
     const repository = createRepository({
       listCategoriesForUser: vi.fn(() => Promise.resolve([existingCategory])),
@@ -90,5 +122,103 @@ describe('category server behavior', () => {
 
     expect(repository.listCategoriesForUser).toHaveBeenCalledWith(existingCategory.userId)
     expect(categories).toEqual([existingCategory])
+  })
+
+  it('updates an owned Category with a normalized reusable name and curated color', async () => {
+    const repository = createRepository()
+
+    const category = await updateCategoryForUser({
+      data: UpdateCategoryInput.parse({
+        colorKey: 'green',
+        id: existingCategory.id,
+        name: '  Life   Admin  ',
+      }),
+      repository,
+      userId: existingCategory.userId,
+    })
+
+    expect(repository.updateCategory).toHaveBeenCalledWith(existingCategory.id, existingCategory.userId, {
+      colorKey: 'green',
+      name: 'life admin',
+    })
+    expect(category).toMatchObject({
+      colorKey: 'green',
+      id: existingCategory.id,
+      name: 'life admin',
+      userId: existingCategory.userId,
+    })
+  })
+
+  it("rejects updating another user's Category", async () => {
+    const repository = createRepository({
+      updateCategory: vi.fn(() => Promise.resolve(undefined)),
+    })
+
+    await expect(
+      updateCategoryForUser({
+        data: {
+          colorKey: 'green',
+          id: existingCategory.id,
+          name: 'life admin',
+        },
+        repository,
+        userId: existingCategory.userId,
+      }),
+    ).rejects.toHaveProperty('status', 404)
+
+    expect(repository.updateCategory).toHaveBeenCalledWith(existingCategory.id, existingCategory.userId, {
+      colorKey: 'green',
+      name: 'life admin',
+    })
+  })
+
+  it('rejects renaming a Category to another existing Category name for the same user', async () => {
+    const repository = createRepository({
+      findCategoryByName: vi.fn(() =>
+        Promise.resolve({
+          colorKey: 'rose',
+          id: 9,
+          name: 'life admin',
+          userId: existingCategory.userId,
+        } as const),
+      ),
+    })
+
+    await expect(
+      updateCategoryForUser({
+        data: {
+          colorKey: 'green',
+          id: existingCategory.id,
+          name: '  Life   Admin  ',
+        },
+        repository,
+        userId: existingCategory.userId,
+      }),
+    ).rejects.toHaveProperty('status', 409)
+
+    expect(repository.findCategoryByName).toHaveBeenCalledWith(existingCategory.userId, 'life admin')
+    expect(repository.updateCategory).not.toHaveBeenCalled()
+  })
+
+  it('allows casing-only Category edits to keep the normalized lowercase name', async () => {
+    const repository = createRepository({
+      findCategoryByName: vi.fn(() => Promise.resolve(existingCategory)),
+    })
+
+    const category = await updateCategoryForUser({
+      data: {
+        colorKey: 'blue',
+        id: existingCategory.id,
+        name: 'HOME ADMIN',
+      },
+      repository,
+      userId: existingCategory.userId,
+    })
+
+    expect(repository.updateCategory).toHaveBeenCalledWith(existingCategory.id, existingCategory.userId, {
+      colorKey: 'blue',
+      name: 'home admin',
+    })
+    expect(category.name).toBe('home admin')
   })
 })
