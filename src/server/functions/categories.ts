@@ -7,8 +7,10 @@ import type { CategoryDbInsert } from '@/server/db/types'
 import type { CategoryRepository } from '@/server/functions/categories.core'
 import {
   CreateCategoryInput,
+  DeleteCategoryInput,
   UpdateCategoryInput,
   createCategoryForUser,
+  deleteCategoryForUser,
   listCategoriesForUser,
   updateCategoryForUser,
 } from '@/server/functions/categories.core'
@@ -45,6 +47,17 @@ export const updateCategory = createServerFn({ method: 'POST' })
     })
   })
 
+export const deleteCategory = createServerFn({ method: 'POST' })
+  .middleware([authRequiredMiddleware])
+  .inputValidator(DeleteCategoryInput)
+  .handler(async ({ data, context }) => {
+    return deleteCategoryForUser({
+      data,
+      repository: categoryRepository,
+      userId: context.session.user.id,
+    })
+  })
+
 const categoryRepository: CategoryRepository = {
   async createCategory(categoryToAdd: CategoryDbInsert) {
     const [category] = await db
@@ -57,6 +70,17 @@ const categoryRepository: CategoryRepository = {
         },
       })
       .returning()
+
+    return category
+  },
+  async deleteCategory(categoryId, userId) {
+    const [category] = await db
+      .delete(categories)
+      .where(and(eq(categories.id, categoryId), eq(categories.userId, userId)))
+      .returning({
+        categoryId: categories.id,
+        userId: categories.userId,
+      })
 
     return category
   },

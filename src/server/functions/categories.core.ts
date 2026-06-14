@@ -19,8 +19,20 @@ export const UpdateCategoryInput = z
   })
   .strict()
 
+export const DeleteCategoryInput = z
+  .object({
+    id: z.number().int(),
+  })
+  .strict()
+
+export type DeletedCategory = {
+  categoryId: number
+  userId: string
+}
+
 export type CategoryRepository = {
   createCategory: (category: CategoryDbInsert) => Promise<CategoryDbSelect>
+  deleteCategory: (categoryId: number, userId: string) => Promise<DeletedCategory | undefined>
   findCategoryByName: (userId: string, name: string) => Promise<CategoryDbSelect | undefined>
   listCategoriesForUser: (userId: string) => Promise<Array<CategoryDbSelect>>
   updateCategory: (
@@ -43,6 +55,12 @@ type ListCategoriesDependencies = {
 
 type UpdateCategoryDependencies = {
   data: z.output<typeof UpdateCategoryInput>
+  repository: CategoryRepository
+  userId: string
+}
+
+type DeleteCategoryDependencies = {
+  data: z.output<typeof DeleteCategoryInput>
   repository: CategoryRepository
   userId: string
 }
@@ -79,6 +97,16 @@ export async function updateCategoryForUser({ data, repository, userId }: Update
   }
 
   return category
+}
+
+export async function deleteCategoryForUser({ data, repository, userId }: DeleteCategoryDependencies) {
+  const deletedCategory = await repository.deleteCategory(data.id, userId)
+
+  if (!deletedCategory) {
+    throw errorResponse(404, 'Category not found or unauthorized')
+  }
+
+  return deletedCategory
 }
 
 export function normalizeCategoryName(name: string) {

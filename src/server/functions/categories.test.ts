@@ -1,9 +1,14 @@
+import { getTableConfig } from 'drizzle-orm/pg-core'
 import { describe, expect, it, vi } from 'vitest'
+
+import { todos } from '@/server/db/schema/schema'
 
 import {
   CreateCategoryInput,
+  DeleteCategoryInput,
   UpdateCategoryInput,
   createCategoryForUser,
+  deleteCategoryForUser,
   listCategoriesForUser,
   updateCategoryForUser,
 } from './categories.core'
@@ -18,6 +23,7 @@ const existingCategory = {
 
 const createRepository = (overrides: Partial<CategoryRepository> = {}): CategoryRepository => ({
   createCategory: vi.fn((categoryToCreate) => Promise.resolve({ id: 8, ...categoryToCreate })),
+  deleteCategory: vi.fn((categoryId, userId) => Promise.resolve({ categoryId, userId })),
   findCategoryByName: vi.fn(() => Promise.resolve(undefined)),
   updateCategory: vi.fn((categoryId, userId, updates) =>
     Promise.resolve({
@@ -220,5 +226,49 @@ describe('category server behavior', () => {
       name: 'home admin',
     })
     expect(category.name).toBe('home admin')
+  })
+
+  it('deletes an owned Category', async () => {
+    const repository = createRepository()
+
+    const deletedCategory = await deleteCategoryForUser({
+      data: DeleteCategoryInput.parse({
+        id: existingCategory.id,
+      }),
+      repository,
+      userId: existingCategory.userId,
+    })
+
+    expect(repository.deleteCategory).toHaveBeenCalledWith(existingCategory.id, existingCategory.userId)
+    expect(deletedCategory).toEqual({
+      categoryId: existingCategory.id,
+      userId: existingCategory.userId,
+    })
+  })
+
+  it("rejects deleting another user's Category", async () => {
+    const repository = createRepository({
+      deleteCategory: vi.fn(() => Promise.resolve(undefined)),
+    })
+
+    await expect(
+      deleteCategoryForUser({
+        data: {
+          id: existingCategory.id,
+        },
+        repository,
+        userId: existingCategory.userId,
+      }),
+    ).rejects.toHaveProperty('status', 404)
+
+    expect(repository.deleteCategory).toHaveBeenCalledWith(existingCategory.id, existingCategory.userId)
+  })
+
+  it('clears Todo Category references when a Category is deleted', () => {
+    const categoryForeignKey = getTableConfig(todos).foreignKeys.find(
+      (foreignKey) => foreignKey.getName() === 'todos_category_id_categories_id_fk',
+    )
+
+    expect(categoryForeignKey?.onDelete).toBe('set null')
   })
 })
