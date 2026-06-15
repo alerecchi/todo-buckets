@@ -1,7 +1,8 @@
 import { z } from 'zod'
 
 import type { CategoryDisplay } from '@/lib/types/Category'
-import type { BucketDb, CategoryDbSelect, TodoDbInsert, TodoDbSelect } from '@/server/db/types'
+import type { TagDisplay } from '@/lib/types/Tag'
+import type { BucketDb, CategoryDbSelect, TagDbSelect, TodoDbInsert, TodoDbSelect } from '@/server/db/types'
 import { errorResponse } from '@/server/utils'
 
 export const CreateTodoInput = z
@@ -9,6 +10,7 @@ export const CreateTodoInput = z
     bucketId: z.int(),
     categoryId: z.int().nullable().optional(),
     description: z.string().optional(),
+    tagIds: z.array(z.int()).optional(),
     title: z.string().trim().min(1),
   })
   .strict()
@@ -26,6 +28,7 @@ export const UpdateTodoInput = z
     completed: z.boolean().optional(),
     description: z.string().optional(),
     id: z.int(),
+    tagIds: z.array(z.int()).optional(),
     title: z.string().trim().min(1).optional(),
   })
   .strict()
@@ -39,6 +42,7 @@ export const DeleteTodoInput = z
 type TodoWithBucket = TodoDbSelect & {
   bucket: BucketDb
   category: CategoryDbSelect | null
+  tags: Array<TagDisplay>
 }
 
 export type DeletedTodo = {
@@ -48,6 +52,7 @@ export type DeletedTodo = {
 
 export type TodoWithCategoryDisplay = TodoDbSelect & {
   category: CategoryDisplay | null
+  tags: Array<TagDisplay>
 }
 
 export type TodoRepository = {
@@ -55,8 +60,10 @@ export type TodoRepository = {
   deleteTodo: (todoId: number, userId: string) => Promise<DeletedTodo | undefined>
   findOwnedActiveBucket: (userId: string, bucketId: number) => Promise<BucketDb | undefined>
   findOwnedCategory: (userId: string, categoryId: number) => Promise<CategoryDbSelect | undefined>
+  findOwnedTags: (userId: string, tagIds: Array<number>) => Promise<Array<TagDbSelect>>
   findOwnedTodoWithBucket: (userId: string, todoId: number) => Promise<TodoWithBucket | undefined>
   getTodosByBucketForUser: (userId: string, bucketId: number) => Promise<Array<TodoWithCategoryDisplay>>
+  replaceTodoTags: (todoId: number, userId: string, tagIds: Array<number>) => Promise<void>
   updateTodo: (todoId: number, userId: string, updates: Partial<TodoDbInsert>) => Promise<TodoDbSelect | undefined>
 }
 
@@ -85,6 +92,8 @@ type DeleteTodoDependencies = OperationDependencies & {
 export async function createTodoForUser({ data, now = () => new Date(), repository, userId }: CreateTodoDependencies) {
   await requireOwnedActiveBucket(repository, userId, data.bucketId)
   const category = await requireOwnedCategoryIfPresent(repository, userId, data.categoryId)
+  const tagIds = getUniqueTagIds(data.tagIds ?? [])
+  const tags = await requireOwnedTags(repository, userId, tagIds)
 
   const todo = await repository.createTodo({
     bucketId: data.bucketId,
@@ -95,8 +104,9 @@ export async function createTodoForUser({ data, now = () => new Date(), reposito
     title: data.title,
     userId,
   })
+  await repository.replaceTodoTags(todo.id, userId, tagIds)
 
-  return withCategoryDisplay(todo, category)
+  return withDisplayData(todo, category, tags)
 }
 
 export async function getTodosForUser({ data, repository, userId }: GetTodosDependencies) {
@@ -123,6 +133,10 @@ export async function updateTodoForUser({ data, repository, userId }: UpdateTodo
     data.categoryId === undefined
       ? toCategoryDisplay(existingTodo.category)
       : await requireOwnedCategoryIfPresent(repository, userId, data.categoryId)
+  const tags =
+    data.tagIds === undefined
+      ? existingTodo.tags.map(toTagDisplay)
+      : await requireOwnedTags(repository, userId, getUniqueTagIds(data.tagIds))
 
   const updates = {
     bucketId: data.bucketId,
@@ -137,7 +151,11 @@ export async function updateTodoForUser({ data, repository, userId }: UpdateTodo
     throw errorResponse(404, 'Todo not found or unauthorized')
   }
 
-  return withCategoryDisplay(updatedTodo, category)
+  if (data.tagIds !== undefined) {
+    await repository.replaceTodoTags(data.id, userId, getUniqueTagIds(data.tagIds))
+  }
+
+  return withDisplayData(updatedTodo, category, tags)
 }
 
 export async function deleteTodoForUser({ data, repository, userId }: DeleteTodoDependencies) {
@@ -178,10 +196,31 @@ async function requireOwnedCategoryIfPresent(
   return toCategoryDisplay(category)
 }
 
-function withCategoryDisplay(todo: TodoDbSelect, category: CategoryDisplay | null): TodoWithCategoryDisplay {
+async function requireOwnedTags(repository: TodoRepository, userId: string, tagIds: Array<number>) {
+  if (tagIds.length === 0) {
+    return []
+  }
+
+  const tags = await repository.findOwnedTags(userId, tagIds)
+
+  if (tags.length !== tagIds.length) {
+    throw errorResponse(404, 'Tag not found or unauthorized')
+  }
+
+  const tagsById = new Map(tags.map((tag) => [tag.id, tag]))
+
+  return tagIds.map((tagId) => toTagDisplay(tagsById.get(tagId)!))
+}
+
+function withDisplayData(
+  todo: TodoDbSelect,
+  category: CategoryDisplay | null,
+  tags: Array<TagDisplay>,
+): TodoWithCategoryDisplay {
   return {
     ...todo,
     category,
+    tags,
   }
 }
 
@@ -197,6 +236,18 @@ function toCategoryDisplay(category: CategoryDbSelect | null): CategoryDisplay |
   }
 }
 
+function toTagDisplay(tag: TagDisplay): TagDisplay {
+  return {
+    colorKey: tag.colorKey,
+    id: tag.id,
+    name: tag.name,
+  }
+}
+
 function removeUndefinedValues<T extends Record<string, unknown>>(values: T) {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) as Partial<T>
+}
+
+function getUniqueTagIds(tagIds: Array<number>) {
+  return [...new Set(tagIds)]
 }

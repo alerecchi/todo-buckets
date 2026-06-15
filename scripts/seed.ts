@@ -5,7 +5,7 @@ import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/neon-http'
 
 import * as schema from '../src/server/db/schema'
-import { accounts, buckets, categories, todos, users } from '../src/server/db/schema'
+import { accounts, buckets, categories, tags, todoTags, todos, users } from '../src/server/db/schema'
 
 const databaseUrl = process.env.DATABASE_URL
 
@@ -42,7 +42,8 @@ async function main() {
   await seedAuthUsers(now)
   const seedBuckets = await seedPrimaryUserBuckets(now)
   const seedCategories = await seedPrimaryUserCategories()
-  await seedPrimaryUserTodos(seedBuckets, seedCategories, now)
+  const seedTags = await seedPrimaryUserTags()
+  await seedPrimaryUserTodos(seedBuckets, seedCategories, seedTags, now)
 
   console.log(
     [
@@ -50,6 +51,7 @@ async function main() {
       `Users: ${seedUsers.map((user) => `${user.email} / ${user.password}`).join(', ')}`,
       `Buckets: ${seedBuckets.length}`,
       `Categories: ${seedCategories.length}`,
+      `Tags: ${seedTags.length}`,
       'Todos: 25',
       shouldReset ? 'Database was reset before seeding.' : 'Database reset was skipped.',
     ].join('\n'),
@@ -58,7 +60,7 @@ async function main() {
 
 async function resetDatabase() {
   await db.execute(
-    sql`truncate table "todos", "categories", "buckets", "accounts", "sessions", "verifications", "users" restart identity cascade`,
+    sql`truncate table "todo_tags", "todos", "tags", "categories", "buckets", "accounts", "sessions", "verifications", "users" restart identity cascade`,
   )
 }
 
@@ -157,28 +159,76 @@ async function seedPrimaryUserCategories() {
     .returning()
 }
 
+async function seedPrimaryUserTags() {
+  return db
+    .insert(tags)
+    .values([
+      {
+        colorKey: 'blue',
+        name: 'urgent',
+        userId: 'seed-user-aaa',
+      },
+      {
+        colorKey: 'green',
+        name: 'focus',
+        userId: 'seed-user-aaa',
+      },
+      {
+        colorKey: 'amber',
+        name: 'blocked',
+        userId: 'seed-user-aaa',
+      },
+      {
+        colorKey: 'orange',
+        name: 'waiting',
+        userId: 'seed-user-aaa',
+      },
+      {
+        colorKey: 'rose',
+        name: 'quick-win',
+        userId: 'seed-user-aaa',
+      },
+    ])
+    .returning()
+}
+
 async function seedPrimaryUserTodos(
   seedBuckets: Array<typeof buckets.$inferSelect>,
   seedCategories: Array<typeof categories.$inferSelect>,
+  seedTags: Array<typeof tags.$inferSelect>,
   now: Date,
 ) {
-  await db.insert(todos).values(
-    Array.from({ length: 25 }, (_, index) => {
-      const todoIndex = index + 1
-      const bucket = seedBuckets[index % seedBuckets.length]
-      const category = todoIndex <= 5 ? seedCategories[index % seedCategories.length] : undefined
+  const seedTodos = await db
+    .insert(todos)
+    .values(
+      Array.from({ length: 25 }, (_, index) => {
+        const todoIndex = index + 1
+        const bucket = seedBuckets[index % seedBuckets.length]
+        const category = todoIndex <= 5 ? seedCategories[index % seedCategories.length] : undefined
 
-      return {
-        bucketId: bucket.id,
-        categoryId: category?.id ?? null,
-        completed: false,
-        createdAt: new Date(now.getTime() + todoIndex * 1000),
-        description: `Seed todo description ${String(todoIndex).padStart(2, '0')}`,
-        title: `Seed Todo ${String(todoIndex).padStart(2, '0')}`,
-        userId: 'seed-user-aaa',
-      }
-    }),
-  )
+        return {
+          bucketId: bucket.id,
+          categoryId: category?.id ?? null,
+          completed: false,
+          createdAt: new Date(now.getTime() + todoIndex * 1000),
+          description: `Seed todo description ${String(todoIndex).padStart(2, '0')}`,
+          title: `Seed Todo ${String(todoIndex).padStart(2, '0')}`,
+          userId: 'seed-user-aaa',
+        }
+      }),
+    )
+    .returning()
+
+  await db.insert(todoTags).values([
+    { tagId: seedTags[0].id, todoId: seedTodos[0].id },
+    { tagId: seedTags[1].id, todoId: seedTodos[0].id },
+    { tagId: seedTags[1].id, todoId: seedTodos[1].id },
+    { tagId: seedTags[2].id, todoId: seedTodos[1].id },
+    { tagId: seedTags[2].id, todoId: seedTodos[2].id },
+    { tagId: seedTags[3].id, todoId: seedTodos[2].id },
+    { tagId: seedTags[3].id, todoId: seedTodos[3].id },
+    { tagId: seedTags[4].id, todoId: seedTodos[4].id },
+  ])
 }
 
 function getCurrentPeriods(date: Date) {

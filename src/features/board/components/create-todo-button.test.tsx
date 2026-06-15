@@ -2,8 +2,9 @@ import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import CreateTodoButton from '@/features/board/components/create-todo-button'
-import { CATEGORIES_QUERY_KEY, TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
+import { CATEGORIES_QUERY_KEY, TAGS_QUERY_KEY, TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
 import { createCategory, deleteCategory, listCategories, updateCategory } from '@/server/functions/categories'
+import { createTag, listTags } from '@/server/functions/tags'
 import { createTodo } from '@/server/functions/todos'
 import { createTestQueryClient, render } from '@/test'
 
@@ -16,6 +17,11 @@ vi.mock('@/server/functions/categories', () => ({
 
 vi.mock('@/server/functions/todos', () => ({
   createTodo: vi.fn(),
+}))
+
+vi.mock('@/server/functions/tags', () => ({
+  createTag: vi.fn(),
+  listTags: vi.fn(() => Promise.resolve([])),
 }))
 
 const buckets = [
@@ -41,6 +47,7 @@ const existingTodo = {
   createdAt: new Date('2026-06-10T10:00:00.000Z'),
   description: '',
   id: 1,
+  tags: [],
   title: 'Existing',
   userId: 'user-1',
 }
@@ -53,6 +60,7 @@ const createdTodo = {
   createdAt: new Date('2026-06-11T10:00:00.000Z'),
   description: 'Bring notes',
   id: 2,
+  tags: [],
   title: 'Plan review',
   userId: 'user-1',
 }
@@ -64,11 +72,27 @@ const createdCategory = {
   userId: 'user-1',
 } as const
 
+const existingTag = {
+  colorKey: 'rose',
+  id: 11,
+  name: 'urgent',
+  userId: 'user-1',
+} as const
+
+const createdTag = {
+  colorKey: 'blue',
+  id: 12,
+  name: 'focus',
+  userId: 'user-1',
+} as const
+
 const mockedCreateTodo = vi.mocked(createTodo)
 const mockedCreateCategory = vi.mocked(createCategory)
 const mockedDeleteCategory = vi.mocked(deleteCategory)
 const mockedListCategories = vi.mocked(listCategories)
 const mockedUpdateCategory = vi.mocked(updateCategory)
+const mockedCreateTag = vi.mocked(createTag)
+const mockedListTags = vi.mocked(listTags)
 
 describe('CreateTodoButton', () => {
   beforeEach(() => {
@@ -76,6 +100,9 @@ describe('CreateTodoButton', () => {
     mockedDeleteCategory.mockReset()
     mockedListCategories.mockReset()
     mockedListCategories.mockResolvedValue([])
+    mockedCreateTag.mockReset()
+    mockedListTags.mockReset()
+    mockedListTags.mockResolvedValue([])
     mockedUpdateCategory.mockReset()
     mockedCreateTodo.mockReset()
   })
@@ -112,6 +139,7 @@ describe('CreateTodoButton', () => {
         bucketId: 2,
         categoryId: null,
         description: 'Bring notes',
+        tagIds: [],
         title: 'Plan review',
       },
     })
@@ -160,7 +188,96 @@ describe('CreateTodoButton', () => {
         bucketId: 1,
         categoryId: createdCategory.id,
         description: '',
+        tagIds: [],
         title: 'Organize cabinet',
+      },
+    })
+  })
+
+  it('creates a Todo with multiple selected Tags', async () => {
+    mockedListTags.mockResolvedValue([existingTag, createdTag])
+    mockedCreateTodo.mockResolvedValue({
+      ...createdTodo,
+      tags: [
+        {
+          colorKey: existingTag.colorKey,
+          id: existingTag.id,
+          name: existingTag.name,
+        },
+        {
+          colorKey: createdTag.colorKey,
+          id: createdTag.id,
+          name: createdTag.name,
+        },
+      ],
+    })
+
+    render(<CreateTodoButton bucketId={1} buckets={buckets} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Plan review' } })
+    fireEvent.click(await screen.findByLabelText(existingTag.name))
+    fireEvent.click(screen.getByLabelText(createdTag.name))
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    await waitFor(() => {
+      expect(mockedCreateTodo).toHaveBeenCalled()
+    })
+    expect(mockedCreateTodo.mock.calls[0]?.[0]).toEqual({
+      data: {
+        bucketId: 1,
+        categoryId: null,
+        description: '',
+        tagIds: [existingTag.id, createdTag.id],
+        title: 'Plan review',
+      },
+    })
+  })
+
+  it('creates a Tag from the picker, selects it, and saves the Todo with it', async () => {
+    mockedCreateTag.mockResolvedValue(createdTag)
+    mockedCreateTodo.mockResolvedValue({
+      ...createdTodo,
+      tags: [
+        {
+          colorKey: createdTag.colorKey,
+          id: createdTag.id,
+          name: createdTag.name,
+        },
+      ],
+    })
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TAGS_QUERY_KEY], [])
+
+    render(<CreateTodoButton bucketId={1} buckets={buckets} />, { queryClient })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Plan review' } })
+    fireEvent.change(screen.getByLabelText('New tag'), { target: { value: '  Focus  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create tag' }))
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(createdTag.name)).toBeChecked()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    await waitFor(() => {
+      expect(mockedCreateTodo).toHaveBeenCalled()
+    })
+    expect(mockedCreateTag.mock.calls[0]?.[0]).toEqual({
+      data: {
+        colorKey: 'blue',
+        name: 'Focus',
+      },
+    })
+    expect(mockedCreateTodo.mock.calls[0]?.[0]).toEqual({
+      data: {
+        bucketId: 1,
+        categoryId: null,
+        description: '',
+        tagIds: [createdTag.id],
+        title: 'Plan review',
       },
     })
   })
