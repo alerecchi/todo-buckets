@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CreateTodoButton from '@/features/board/components/create-todo-button'
 import { CATEGORIES_QUERY_KEY, TAGS_QUERY_KEY, TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
 import { createCategory, deleteCategory, listCategories, updateCategory } from '@/server/functions/categories'
-import { createTag, listTags } from '@/server/functions/tags'
+import { createTag, listTags, updateTag } from '@/server/functions/tags'
 import { createTodo } from '@/server/functions/todos'
 import { createTestQueryClient, render } from '@/test'
 
@@ -22,6 +22,7 @@ vi.mock('@/server/functions/todos', () => ({
 vi.mock('@/server/functions/tags', () => ({
   createTag: vi.fn(),
   listTags: vi.fn(() => Promise.resolve([])),
+  updateTag: vi.fn(),
 }))
 
 const buckets = [
@@ -93,6 +94,7 @@ const mockedListCategories = vi.mocked(listCategories)
 const mockedUpdateCategory = vi.mocked(updateCategory)
 const mockedCreateTag = vi.mocked(createTag)
 const mockedListTags = vi.mocked(listTags)
+const mockedUpdateTag = vi.mocked(updateTag)
 
 describe('CreateTodoButton', () => {
   beforeEach(() => {
@@ -103,6 +105,7 @@ describe('CreateTodoButton', () => {
     mockedCreateTag.mockReset()
     mockedListTags.mockReset()
     mockedListTags.mockResolvedValue([])
+    mockedUpdateTag.mockReset()
     mockedUpdateCategory.mockReset()
     mockedCreateTodo.mockReset()
   })
@@ -280,6 +283,109 @@ describe('CreateTodoButton', () => {
         title: 'Plan review',
       },
     })
+  })
+
+  it('renames and recolors a Tag immediately and patches cached Todo card badges without submitting the Todo', async () => {
+    const updatedTag = {
+      colorKey: 'green',
+      id: existingTag.id,
+      name: 'next_up',
+      userId: 'user-1',
+    } as const
+    mockedListTags.mockResolvedValue([existingTag])
+    mockedUpdateTag.mockResolvedValue(updatedTag)
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TAGS_QUERY_KEY], [existingTag])
+    queryClient.setQueryData(
+      [TODOS_QUERY_KEY, 1],
+      [
+        {
+          ...existingTodo,
+          tags: [
+            {
+              colorKey: existingTag.colorKey,
+              id: existingTag.id,
+              name: existingTag.name,
+            },
+          ],
+        },
+      ],
+    )
+    queryClient.setQueryData(
+      [TODOS_QUERY_KEY, 2],
+      [
+        {
+          ...createdTodo,
+          tags: [
+            {
+              colorKey: existingTag.colorKey,
+              id: existingTag.id,
+              name: existingTag.name,
+            },
+          ],
+        },
+      ],
+    )
+
+    render(<CreateTodoButton bucketId={1} buckets={buckets} />, { queryClient })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+    expect(await screen.findByLabelText(existingTag.name)).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Edit tag name'), { target: { value: '  Next_Up  ' } })
+    fireEvent.change(screen.getByLabelText('Edit tag color'), { target: { value: 'green' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save tag' }))
+
+    await waitFor(() => {
+      expect(mockedUpdateTag).toHaveBeenCalled()
+    })
+    expect(mockedUpdateTag.mock.calls[0]?.[0]).toEqual({
+      data: {
+        colorKey: 'green',
+        id: existingTag.id,
+        name: 'Next_Up',
+      },
+    })
+    expect(mockedCreateTodo).not.toHaveBeenCalled()
+    expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
+    expect(queryClient.getQueryData([TAGS_QUERY_KEY])).toEqual([updatedTag])
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, 1])).toEqual([
+      expect.objectContaining({
+        tags: [
+          {
+            colorKey: 'green',
+            id: existingTag.id,
+            name: 'next_up',
+          },
+        ],
+      }),
+    ])
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, 2])).toEqual([
+      expect.objectContaining({
+        tags: [
+          {
+            colorKey: 'green',
+            id: existingTag.id,
+            name: 'next_up',
+          },
+        ],
+      }),
+    ])
+  })
+
+  it('keeps Tag edit errors local to the picker', async () => {
+    mockedListTags.mockResolvedValue([existingTag])
+    mockedUpdateTag.mockRejectedValue(new Error('Tag name already exists'))
+
+    render(<CreateTodoButton bucketId={1} buckets={buckets} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+    expect(await screen.findByLabelText(existingTag.name)).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Edit tag name'), { target: { value: 'focus' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save tag' }))
+
+    expect(await screen.findByText('Tag name already exists')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
+    expect(mockedCreateTodo).not.toHaveBeenCalled()
   })
 
   it('keeps the dialog open and shows feedback when Category creation fails', async () => {

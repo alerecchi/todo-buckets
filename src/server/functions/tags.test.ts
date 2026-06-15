@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { CreateTagInput, createTagForUser, listTagsForUser } from './tags.core'
+import {
+  CreateTagInput,
+  TagNameConflictError,
+  UpdateTagInput,
+  createTagForUser,
+  listTagsForUser,
+  updateTagForUser,
+} from './tags.core'
 import type { TagRepository } from './tags.core'
 
 const existingTag = {
@@ -12,7 +19,16 @@ const existingTag = {
 
 const createRepository = (overrides: Partial<TagRepository> = {}): TagRepository => ({
   createTag: vi.fn((tagToCreate) => Promise.resolve({ id: 8, ...tagToCreate })),
+  findTagByName: vi.fn(() => Promise.resolve(undefined)),
   listTagsForUser: vi.fn(() => Promise.resolve([])),
+  updateTag: vi.fn((tagId, userId, updates) =>
+    Promise.resolve({
+      ...existingTag,
+      ...updates,
+      id: tagId,
+      userId,
+    }),
+  ),
   ...overrides,
 })
 
@@ -74,6 +90,16 @@ describe('tag server behavior', () => {
     expect(CreateTagInput.safeParse({ colorKey: 'legacy-color', name: 'urgent' }).success).toBe(false)
   })
 
+  it('rejects invalid Tag update input at the validation boundary', () => {
+    expect(UpdateTagInput.safeParse({ colorKey: 'blue', id: existingTag.id, name: 'urgent now' }).success).toBe(false)
+    expect(UpdateTagInput.safeParse({ colorKey: 'blue', id: existingTag.id, name: 'urgent.now' }).success).toBe(false)
+    expect(UpdateTagInput.safeParse({ colorKey: 'blue', id: existingTag.id, name: '' }).success).toBe(false)
+    expect(UpdateTagInput.safeParse({ colorKey: 'blue', id: existingTag.id, name: 'a'.repeat(33) }).success).toBe(false)
+    expect(UpdateTagInput.safeParse({ colorKey: 'legacy-color', id: existingTag.id, name: 'urgent' }).success).toBe(
+      false,
+    )
+  })
+
   it('lists Tags for the current user only', async () => {
     const repository = createRepository({
       listTagsForUser: vi.fn(() => Promise.resolve([existingTag])),
@@ -92,5 +118,126 @@ describe('tag server behavior', () => {
         name: existingTag.name,
       },
     ])
+  })
+
+  it('updates an owned Tag with a normalized compact handle and curated color', async () => {
+    const repository = createRepository()
+
+    const tag = await updateTagForUser({
+      data: UpdateTagInput.parse({
+        colorKey: 'green',
+        id: existingTag.id,
+        name: '  Next_Up  ',
+      }),
+      repository,
+      userId: existingTag.userId,
+    })
+
+    expect(repository.updateTag).toHaveBeenCalledWith(existingTag.id, existingTag.userId, {
+      colorKey: 'green',
+      name: 'next_up',
+    })
+    expect(tag).toMatchObject({
+      colorKey: 'green',
+      id: existingTag.id,
+      name: 'next_up',
+    })
+  })
+
+  it("rejects updating another user's Tag", async () => {
+    const repository = createRepository({
+      updateTag: vi.fn(() => Promise.resolve(undefined)),
+    })
+
+    await expect(
+      updateTagForUser({
+        data: {
+          colorKey: 'green',
+          id: existingTag.id,
+          name: 'life',
+        },
+        repository,
+        userId: existingTag.userId,
+      }),
+    ).rejects.toHaveProperty('status', 404)
+
+    expect(repository.updateTag).toHaveBeenCalledWith(existingTag.id, existingTag.userId, {
+      colorKey: 'green',
+      name: 'life',
+    })
+  })
+
+  it('rejects renaming a Tag to another existing Tag handle for the same user', async () => {
+    const repository = createRepository({
+      findTagByName: vi.fn(() =>
+        Promise.resolve({
+          colorKey: 'rose',
+          id: 9,
+          name: 'next_up',
+          userId: existingTag.userId,
+        } as const),
+      ),
+    })
+
+    await expect(
+      updateTagForUser({
+        data: UpdateTagInput.parse({
+          colorKey: 'green',
+          id: existingTag.id,
+          name: '  Next_Up  ',
+        }),
+        repository,
+        userId: existingTag.userId,
+      }),
+    ).rejects.toHaveProperty('status', 409)
+
+    expect(repository.findTagByName).toHaveBeenCalledWith(existingTag.userId, 'next_up')
+    expect(repository.updateTag).not.toHaveBeenCalled()
+  })
+
+  it('rejects a raced Tag rename conflict that reaches the repository update', async () => {
+    const repository = createRepository({
+      updateTag: vi.fn(() => Promise.reject(new TagNameConflictError())),
+    })
+
+    await expect(
+      updateTagForUser({
+        data: UpdateTagInput.parse({
+          colorKey: 'green',
+          id: existingTag.id,
+          name: '  Next_Up  ',
+        }),
+        repository,
+        userId: existingTag.userId,
+      }),
+    ).rejects.toHaveProperty('status', 409)
+
+    expect(repository.findTagByName).toHaveBeenCalledWith(existingTag.userId, 'next_up')
+    expect(repository.updateTag).toHaveBeenCalledWith(existingTag.id, existingTag.userId, {
+      colorKey: 'green',
+      name: 'next_up',
+    })
+  })
+
+  it('allows casing-only Tag edits to keep the normalized lowercase handle', async () => {
+    const repository = createRepository({
+      findTagByName: vi.fn(() => Promise.resolve(existingTag)),
+    })
+
+    const tag = await updateTagForUser({
+      data: UpdateTagInput.parse({
+        colorKey: 'blue',
+        id: existingTag.id,
+        name: 'URGENT_NOW',
+      }),
+      repository,
+      userId: existingTag.userId,
+    })
+
+    expect(repository.updateTag).toHaveBeenCalledWith(existingTag.id, existingTag.userId, {
+      colorKey: 'blue',
+      name: 'urgent_now',
+    })
+    expect(tag.name).toBe('urgent_now')
   })
 })

@@ -13,6 +13,7 @@ import useCreateTag from '@/features/board/hooks/use-create-tag'
 import useCreateTodo from '@/features/board/hooks/use-create-todo'
 import useDeleteCategory from '@/features/board/hooks/use-delete-category'
 import useUpdateCategory from '@/features/board/hooks/use-update-category'
+import useUpdateTag from '@/features/board/hooks/use-update-tag'
 import { getCategoriesQueryOptions } from '@/features/board/queries/category-queries'
 import { getTagsQueryOptions } from '@/features/board/queries/tag-queries'
 import { getErrorMessage as getFieldErrorMessage } from '@/features/shared/utils/form'
@@ -42,6 +43,8 @@ type TodoFormValues = {
   newCategoryName: string
   newTagColorKey: TagColorKey
   newTagName: string
+  tagEditColorKeys: Record<string, TagColorKey>
+  tagEditNames: Record<string, string>
   tagIds: Array<string>
   title: string
 }
@@ -62,11 +65,13 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
   const [categoryDeleteError, setCategoryDeleteError] = useState('')
   const [categoryEditError, setCategoryEditError] = useState('')
   const [tagCreateError, setTagCreateError] = useState('')
+  const [tagEditErrors, setTagEditErrors] = useState<Record<number, string>>({})
   const createCategoryMutation = useCreateCategory()
   const createTagMutation = useCreateTag()
   const createTodoMutation = useCreateTodo()
   const deleteCategoryMutation = useDeleteCategory()
   const updateCategoryMutation = useUpdateCategory()
+  const updateTagMutation = useUpdateTag()
   const { data: categories = [] } = useQuery(getCategoriesQueryOptions)
   const { data: tags = [] } = useQuery(getTagsQueryOptions)
 
@@ -102,6 +107,7 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
       setCategoryDeleteError('')
       setCategoryEditError('')
       setTagCreateError('')
+      setTagEditErrors({})
     }
   }, [defaultBucketId, form, isOpen])
 
@@ -162,6 +168,47 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
       form.setFieldValue('newTagName', '')
     } catch (error) {
       setTagCreateError(await getOperationErrorMessage(error, 'Could not create the tag.'))
+    }
+  }
+
+  const handleUpdateTag = async (
+    tagId: number,
+    values: {
+      colorKey: TagColorKey
+      name: string
+    },
+  ) => {
+    const name = values.name.trim()
+
+    if (!name) {
+      return
+    }
+
+    setTagEditErrors((errors) => {
+      const { [tagId]: _removed, ...remainingErrors } = errors
+      return remainingErrors
+    })
+
+    try {
+      const tag = await updateTagMutation.mutateAsync({
+        data: {
+          colorKey: values.colorKey,
+          id: tagId,
+          name,
+        },
+      })
+      const tagFormId = String(tag.id)
+      form.setFieldValue('tagEditColorKeys', {
+        ...form.state.values.tagEditColorKeys,
+        [tagFormId]: tag.colorKey,
+      })
+      form.setFieldValue('tagEditNames', {
+        ...form.state.values.tagEditNames,
+        [tagFormId]: tag.name,
+      })
+    } catch (error) {
+      const errorMessage = await getOperationErrorMessage(error, 'Could not save the tag.')
+      setTagEditErrors((errors) => ({ ...errors, [tagId]: errorMessage }))
     }
   }
 
@@ -516,33 +563,92 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
               children={(field) => (
                 <Field className='gap-2'>
                   <FieldLabel>Tags</FieldLabel>
-                  <div className='flex flex-wrap gap-2'>
-                    {tags.length === 0 && <span className='text-sm text-muted-foreground'>No tags</span>}
-                    {tags.map((tag) => {
-                      const tagId = String(tag.id)
-                      const selected = field.state.value.includes(tagId)
-
-                      return (
-                        <label
-                          key={tag.id}
-                          className={cn(
-                            'inline-flex h-8 items-center gap-2 rounded-md border px-2 text-sm',
-                            selected && 'border-primary bg-primary/10',
-                          )}
-                        >
-                          <input
-                            type='checkbox'
-                            checked={selected}
-                            onBlur={field.handleBlur}
-                            onChange={(event) => {
-                              handleTagSelectionChange(tagId, event.target.checked, field.state.value)
-                            }}
-                          />
-                          {tag.name}
-                        </label>
-                      )
+                  <form.Subscribe
+                    selector={(state) => ({
+                      tagEditColorKeys: state.values.tagEditColorKeys,
+                      tagEditNames: state.values.tagEditNames,
                     })}
-                  </div>
+                    children={({ tagEditColorKeys, tagEditNames }) => (
+                      <div className='grid gap-3'>
+                        {tags.length === 0 && <span className='text-sm text-muted-foreground'>No tags</span>}
+                        {tags.map((tag) => {
+                          const tagId = String(tag.id)
+                          const selected = field.state.value.includes(tagId)
+                          const editName = tagEditNames[tagId] ?? tag.name
+                          const editColorKey = tagEditColorKeys[tagId] ?? tag.colorKey
+
+                          return (
+                            <div key={tag.id} className='grid gap-2 rounded-md border p-2'>
+                              <label
+                                className={cn(
+                                  'inline-flex h-8 items-center gap-2 rounded-md border px-2 text-sm',
+                                  selected && 'border-primary bg-primary/10',
+                                )}
+                              >
+                                <input
+                                  type='checkbox'
+                                  checked={selected}
+                                  onBlur={field.handleBlur}
+                                  onChange={(event) => {
+                                    handleTagSelectionChange(tagId, event.target.checked, field.state.value)
+                                  }}
+                                />
+                                {tag.name}
+                              </label>
+                              <div className='grid grid-cols-[1fr_auto_auto] gap-2'>
+                                <Input
+                                  aria-label='Edit tag name'
+                                  autoComplete='off'
+                                  value={editName}
+                                  onChange={(event) => {
+                                    form.setFieldValue('tagEditNames', {
+                                      ...tagEditNames,
+                                      [tagId]: event.target.value,
+                                    })
+                                  }}
+                                />
+                                <select
+                                  aria-label='Edit tag color'
+                                  value={editColorKey}
+                                  onChange={(event) => {
+                                    form.setFieldValue('tagEditColorKeys', {
+                                      ...tagEditColorKeys,
+                                      [tagId]: event.target.value as TagColorKey,
+                                    })
+                                  }}
+                                  className={cn(
+                                    'h-9 rounded-md border border-input bg-transparent px-2.5 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm',
+                                  )}
+                                >
+                                  {TAG_COLOR_KEYS.map((colorKey) => (
+                                    <option key={colorKey} value={colorKey}>
+                                      {colorKey}
+                                    </option>
+                                  ))}
+                                </select>
+                                <Button
+                                  type='button'
+                                  variant='secondary'
+                                  onClick={() =>
+                                    void handleUpdateTag(tag.id, {
+                                      colorKey: editColorKey,
+                                      name: editName,
+                                    })
+                                  }
+                                  disabled={updateTagMutation.isPending || !editName.trim()}
+                                >
+                                  Save tag
+                                </Button>
+                              </div>
+                              {tagEditErrors[tag.id] && (
+                                <FieldError className='text-xs font-medium'>{tagEditErrors[tag.id]}</FieldError>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  />
                 </Field>
               )}
             />
@@ -646,6 +752,8 @@ function getDefaultFormValues(defaultBucketId: number): TodoFormValues {
     newCategoryName: '',
     newTagColorKey: DEFAULT_TAG_COLOR_KEY,
     newTagName: '',
+    tagEditColorKeys: {},
+    tagEditNames: {},
     tagIds: [],
     title: '',
   }
