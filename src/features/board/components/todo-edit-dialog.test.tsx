@@ -6,7 +6,7 @@ import { TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
 import type { Bucket } from '@/lib/types/Bucket'
 import { listCategories } from '@/server/functions/categories'
 import { listTags } from '@/server/functions/tags'
-import { getTodos, updateTodo } from '@/server/functions/todos'
+import { deleteTodo, getTodos, updateTodo } from '@/server/functions/todos'
 import { createTestQueryClient, render } from '@/test'
 
 vi.mock('@/server/functions/categories', () => ({
@@ -25,6 +25,7 @@ vi.mock('@/server/functions/tags', () => ({
 
 vi.mock('@/server/functions/todos', () => ({
   createTodo: vi.fn(),
+  deleteTodo: vi.fn(),
   getTodos: vi.fn(() => Promise.resolve([])),
   updateTodo: vi.fn(),
 }))
@@ -95,6 +96,7 @@ const existingTodo = {
 const mockedGetTodos = vi.mocked(getTodos)
 const mockedListCategories = vi.mocked(listCategories)
 const mockedListTags = vi.mocked(listTags)
+const mockedDeleteTodo = vi.mocked(deleteTodo)
 const mockedUpdateTodo = vi.mocked(updateTodo)
 
 describe('Todo card edit dialog', () => {
@@ -105,7 +107,9 @@ describe('Todo card edit dialog', () => {
     mockedListCategories.mockResolvedValue([])
     mockedListTags.mockReset()
     mockedListTags.mockResolvedValue([])
+    mockedDeleteTodo.mockReset()
     mockedUpdateTodo.mockReset()
+    vi.spyOn(window, 'confirm').mockRestore()
   })
 
   it('opens edit mode from a Todo card with the existing Todo values', async () => {
@@ -303,5 +307,83 @@ describe('Todo card edit dialog', () => {
     expect(screen.getByLabelText('Title')).toHaveValue(existingTodo.title)
     expect(screen.getByLabelText('Description')).toHaveValue(existingTodo.description)
     expect(mockedUpdateTodo).not.toHaveBeenCalled()
+  })
+
+  it('confirms before deleting a Todo, closes edit mode, and removes the card from the Bucket cache', async () => {
+    mockedGetTodos.mockResolvedValue([existingTodo])
+    mockedDeleteTodo.mockResolvedValue({
+      bucketId: existingTodo.bucketId,
+      todoId: existingTodo.id,
+    })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TODOS_QUERY_KEY, existingTodo.bucketId], [existingTodo])
+
+    render(<BucketColumn bucket={buckets[1]} buckets={buckets} />, { queryClient })
+
+    fireEvent.click(screen.getByText(existingTodo.title))
+    expect(await screen.findByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete todo' }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Edit Task' })).not.toBeInTheDocument()
+    })
+    expect(window.confirm).toHaveBeenCalledWith('Delete this todo? This cannot be undone.')
+    expect(mockedDeleteTodo.mock.calls[0]?.[0]).toEqual({
+      data: {
+        id: existingTodo.id,
+      },
+    })
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, existingTodo.bucketId])).toEqual([])
+    expect(screen.queryByText(existingTodo.title)).not.toBeInTheDocument()
+  })
+
+  it('keeps edit mode open and leaves the Todo cached when delete confirmation is cancelled', async () => {
+    mockedGetTodos.mockResolvedValue([existingTodo])
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TODOS_QUERY_KEY, existingTodo.bucketId], [existingTodo])
+
+    render(<BucketColumn bucket={buckets[1]} buckets={buckets} />, { queryClient })
+
+    fireEvent.click(screen.getByText(existingTodo.title))
+    expect(await screen.findByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete todo' }))
+
+    expect(window.confirm).toHaveBeenCalledWith('Delete this todo? This cannot be undone.')
+    expect(mockedDeleteTodo).not.toHaveBeenCalled()
+    expect(screen.getByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, existingTodo.bucketId])).toEqual([existingTodo])
+  })
+
+  it('keeps edit mode open and shows feedback when deleting a Todo fails', async () => {
+    mockedGetTodos.mockResolvedValue([existingTodo])
+    mockedDeleteTodo.mockRejectedValue(new Error('Todo not found or unauthorized'))
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TODOS_QUERY_KEY, existingTodo.bucketId], [existingTodo])
+
+    render(<BucketColumn bucket={buckets[1]} buckets={buckets} />, { queryClient })
+
+    fireEvent.click(screen.getByText(existingTodo.title))
+    expect(await screen.findByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete todo' }))
+
+    expect(await screen.findByText('Todo not found or unauthorized')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, existingTodo.bucketId])).toEqual([existingTodo])
+  })
+
+  it('does not expose Todo deletion in create mode', async () => {
+    mockedGetTodos.mockResolvedValue([])
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TODOS_QUERY_KEY, buckets[1].id], [])
+
+    render(<BucketColumn bucket={buckets[1]} buckets={buckets} />, { queryClient })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+
+    expect(await screen.findByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete todo' })).not.toBeInTheDocument()
   })
 })

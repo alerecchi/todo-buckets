@@ -17,6 +17,7 @@ vi.mock('@/server/functions/categories', () => ({
 
 vi.mock('@/server/functions/todos', () => ({
   createTodo: vi.fn(),
+  deleteTodo: vi.fn(),
   updateTodo: vi.fn(),
 }))
 
