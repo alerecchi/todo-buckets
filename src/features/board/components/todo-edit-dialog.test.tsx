@@ -191,6 +191,7 @@ describe('Todo card edit dialog', () => {
     })
     expect(mockedUpdateTodo.mock.calls[0]?.[0]).toEqual({
       data: {
+        bucketId: existingTodo.bucketId,
         categoryId: null,
         description: 'Bring slides',
         id: existingTodo.id,
@@ -199,6 +200,46 @@ describe('Todo card edit dialog', () => {
       },
     })
     expect(queryClient.getQueryData([TODOS_QUERY_KEY, existingTodo.bucketId])).toEqual([updatedTodo])
+  })
+
+  it('saves a Bucket change from edit mode', async () => {
+    const movedTodo = {
+      ...existingTodo,
+      bucketId: buckets[0].id,
+      title: 'Plan moved review',
+    }
+    const staleMovedTodo = {
+      ...existingTodo,
+      bucketId: buckets[0].id,
+      title: 'Stale moved review',
+    }
+    mockedGetTodos.mockResolvedValue([existingTodo])
+    mockedUpdateTodo.mockResolvedValue(movedTodo)
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TODOS_QUERY_KEY, existingTodo.bucketId], [existingTodo])
+    queryClient.setQueryData([TODOS_QUERY_KEY, buckets[0].id], [staleMovedTodo])
+
+    render(<BucketColumn bucket={buckets[1]} buckets={buckets} />, { queryClient })
+
+    fireEvent.click(screen.getByText(existingTodo.title))
+    expect(await screen.findByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Bucket'), { target: { value: String(buckets[0].id) } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => {
+      expect(mockedUpdateTodo.mock.calls[0]?.[0]).toEqual({
+        data: {
+          bucketId: buckets[0].id,
+          categoryId: category.id,
+          description: existingTodo.description,
+          id: existingTodo.id,
+          tagIds: [tag.id],
+          title: existingTodo.title,
+        },
+      })
+    })
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, existingTodo.bucketId])).toEqual([])
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, buckets[0].id])).toEqual([movedTodo])
   })
 
   it('keeps edit mode open and shows feedback when saving Todo edits fails', async () => {
@@ -217,6 +258,26 @@ describe('Todo card edit dialog', () => {
     expect(await screen.findByText('Could not save changes.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
     expect(queryClient.getQueryData([TODOS_QUERY_KEY, existingTodo.bucketId])).toEqual([existingTodo])
+  })
+
+  it('keeps edit mode open and leaves caches unchanged when a Bucket move fails', async () => {
+    mockedGetTodos.mockResolvedValue([existingTodo])
+    mockedUpdateTodo.mockRejectedValue(new Error('Bucket not found, archived, or unauthorized'))
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TODOS_QUERY_KEY, existingTodo.bucketId], [existingTodo])
+    queryClient.setQueryData([TODOS_QUERY_KEY, buckets[0].id], [])
+
+    render(<BucketColumn bucket={buckets[1]} buckets={buckets} />, { queryClient })
+
+    fireEvent.click(screen.getByText(existingTodo.title))
+    expect(await screen.findByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Bucket'), { target: { value: String(buckets[0].id) } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('Bucket not found, archived, or unauthorized')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, existingTodo.bucketId])).toEqual([existingTodo])
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, buckets[0].id])).toEqual([])
   })
 
   it('discards unsaved Todo field changes when edit mode is cancelled', async () => {

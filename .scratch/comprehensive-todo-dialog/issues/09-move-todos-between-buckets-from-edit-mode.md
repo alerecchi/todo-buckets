@@ -8,12 +8,12 @@ Complete the edit-mode Bucket movement path. A signed-in user can change the sel
 
 ## Acceptance criteria
 
-- [ ] Edit mode lets the user choose a different active Bucket owned by the current user.
-- [ ] Moving a Todo to another Bucket requires the target Bucket to be active and owned by the current user.
-- [ ] Successful Bucket move removes the Todo from the old Bucket cache and adds or replaces it in the new Bucket cache using the returned Todo display data.
-- [ ] Failed Bucket moves keep the dialog open and show a main Todo operation error.
-- [ ] Server-function tests cover successful Bucket moves, archived target rejection, and another user's Bucket rejection.
-- [ ] Dialog/cache behavior tests cover Bucket move save, old-column removal, new-column add/replace, and failed-move feedback.
+- [x] Edit mode lets the user choose a different active Bucket owned by the current user.
+- [x] Moving a Todo to another Bucket requires the target Bucket to be active and owned by the current user.
+- [x] Successful Bucket move removes the Todo from the old Bucket cache and adds or replaces it in the new Bucket cache using the returned Todo display data.
+- [x] Failed Bucket moves keep the dialog open and show a main Todo operation error.
+- [x] Server-function tests cover successful Bucket moves, archived target rejection, and another user's Bucket rejection.
+- [x] Dialog/cache behavior tests cover Bucket move save, old-column removal, new-column add/replace, and failed-move feedback.
 
 ## Blocked by
 
