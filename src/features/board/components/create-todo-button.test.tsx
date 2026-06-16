@@ -2,14 +2,15 @@ import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import CreateTodoButton from '@/features/board/components/create-todo-button'
-import { TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
-import { createCategory, listCategories } from '@/server/functions/categories'
+import { CATEGORIES_QUERY_KEY, TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
+import { createCategory, listCategories, updateCategory } from '@/server/functions/categories'
 import { createTodo } from '@/server/functions/todos'
 import { createTestQueryClient, render } from '@/test'
 
 vi.mock('@/server/functions/categories', () => ({
   createCategory: vi.fn(),
   listCategories: vi.fn(() => Promise.resolve([])),
+  updateCategory: vi.fn(),
 }))
 
 vi.mock('@/server/functions/todos', () => ({
@@ -65,12 +66,14 @@ const createdCategory = {
 const mockedCreateTodo = vi.mocked(createTodo)
 const mockedCreateCategory = vi.mocked(createCategory)
 const mockedListCategories = vi.mocked(listCategories)
+const mockedUpdateCategory = vi.mocked(updateCategory)
 
 describe('CreateTodoButton', () => {
   beforeEach(() => {
     mockedCreateCategory.mockReset()
     mockedListCategories.mockReset()
     mockedListCategories.mockResolvedValue([])
+    mockedUpdateCategory.mockReset()
     mockedCreateTodo.mockReset()
   })
 
@@ -135,6 +138,8 @@ describe('CreateTodoButton', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Category')).toHaveValue(String(createdCategory.id))
     })
+    expect(screen.getByLabelText('Edit category name')).toHaveValue(createdCategory.name)
+    expect(screen.getByLabelText('Edit category color')).toHaveValue(createdCategory.colorKey)
 
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
@@ -169,6 +174,105 @@ describe('CreateTodoButton', () => {
     expect(await screen.findByText('Could not create the category.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
     expect(screen.getByLabelText('Category')).toHaveValue('')
+  })
+
+  it('renames and recolors a Category immediately and patches cached Todo cards without submitting the Todo', async () => {
+    const updatedCategory = {
+      colorKey: 'green',
+      id: createdCategory.id,
+      name: 'life admin',
+      userId: 'user-1',
+    } as const
+    mockedListCategories.mockResolvedValue([createdCategory])
+    mockedUpdateCategory.mockResolvedValue(updatedCategory)
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([CATEGORIES_QUERY_KEY], [createdCategory])
+    queryClient.setQueryData(
+      [TODOS_QUERY_KEY, 1],
+      [
+        {
+          ...existingTodo,
+          category: {
+            colorKey: createdCategory.colorKey,
+            id: createdCategory.id,
+            name: createdCategory.name,
+          },
+          categoryId: createdCategory.id,
+        },
+      ],
+    )
+    queryClient.setQueryData(
+      [TODOS_QUERY_KEY, 2],
+      [
+        {
+          ...createdTodo,
+          category: {
+            colorKey: createdCategory.colorKey,
+            id: createdCategory.id,
+            name: createdCategory.name,
+          },
+          categoryId: createdCategory.id,
+        },
+      ],
+    )
+
+    render(<CreateTodoButton bucketId={1} buckets={buckets} />, { queryClient })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+    expect(await screen.findByRole('option', { name: createdCategory.name })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Category'), { target: { value: String(createdCategory.id) } })
+    fireEvent.change(await screen.findByLabelText('Edit category name'), { target: { value: '  Life   Admin  ' } })
+    fireEvent.change(screen.getByLabelText('Edit category color'), { target: { value: 'green' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save category' }))
+
+    await waitFor(() => {
+      expect(mockedUpdateCategory).toHaveBeenCalled()
+    })
+    expect(mockedUpdateCategory.mock.calls[0]?.[0]).toEqual({
+      data: {
+        colorKey: 'green',
+        id: createdCategory.id,
+        name: 'Life   Admin',
+      },
+    })
+    expect(mockedCreateTodo).not.toHaveBeenCalled()
+    expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
+    expect(queryClient.getQueryData([CATEGORIES_QUERY_KEY])).toEqual([updatedCategory])
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, 1])).toEqual([
+      expect.objectContaining({
+        category: {
+          colorKey: 'green',
+          id: createdCategory.id,
+          name: 'life admin',
+        },
+      }),
+    ])
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, 2])).toEqual([
+      expect.objectContaining({
+        category: {
+          colorKey: 'green',
+          id: createdCategory.id,
+          name: 'life admin',
+        },
+      }),
+    ])
+  })
+
+  it('keeps Category edit errors local to the picker', async () => {
+    mockedListCategories.mockResolvedValue([createdCategory])
+    mockedUpdateCategory.mockRejectedValue(new Error('Category name already exists'))
+
+    render(<CreateTodoButton bucketId={1} buckets={buckets} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+    expect(await screen.findByRole('option', { name: createdCategory.name })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Category'), { target: { value: String(createdCategory.id) } })
+    fireEvent.change(await screen.findByLabelText('Edit category name'), { target: { value: 'life admin' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save category' }))
+
+    expect(await screen.findByText('Category name already exists')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
+    expect(mockedCreateTodo).not.toHaveBeenCalled()
   })
 
   it('rejects missing title and missing bucket before saving', async () => {

@@ -35,7 +35,7 @@ describe('TodoCard', () => {
     expect(screen.getByText('home admin')).toBeInTheDocument()
     expect(card).toHaveClass('border-l-4')
     expect(card).toHaveClass('[--todo-category-color:var(--color-blue-500)]')
-    expect(card).toHaveClass('[border-left-color:var(--todo-category-color)]')
+    expect(card).toHaveClass('border-l-(--todo-category-color)')
   })
 
   it('mutes Category color styling when the Todo is completed', () => {
@@ -45,7 +45,7 @@ describe('TodoCard', () => {
 
     expect(card).toHaveClass('border-l-4')
     expect(card).toHaveClass(
-      'data-[completed=true]:[border-left-color:color-mix(in_oklab,var(--todo-category-color)_70%,transparent)]',
+      'data-[completed=true]:border-l-[color-mix(in_oklab,var(--todo-category-color)_70%,transparent)]',
     )
   })
 

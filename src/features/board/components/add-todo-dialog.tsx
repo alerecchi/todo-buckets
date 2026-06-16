@@ -10,6 +10,7 @@ import z from 'zod'
 
 import useCreateCategory from '@/features/board/hooks/use-create-category'
 import useCreateTodo from '@/features/board/hooks/use-create-todo'
+import useUpdateCategory from '@/features/board/hooks/use-update-category'
 import { getCategoriesQueryOptions } from '@/features/board/queries/category-queries'
 import { getErrorMessage as getFieldErrorMessage } from '@/features/shared/utils/form'
 import { cn } from '@/features/shared/utils/tailwind'
@@ -28,13 +29,18 @@ interface TodoDialogProps {
 
 type TodoFormValues = {
   bucketId: string
+  categoryEditColorKey: CategoryColorKey
+  categoryEditName: string
   categoryId: string
   description: string
+  newCategoryColorKey: CategoryColorKey
+  newCategoryName: string
   title: string
 }
 
 const titleValidator = z.string().trim().min(1, 'Title is required.')
 const bucketValidator = z.string().min(1, 'Bucket is required.')
+const operationErrorBodySchema = z.object({ message: z.string() }).partial()
 const bucketTypeLabels = {
   daily: 'Daily',
   inbox: 'Inbox',
@@ -45,10 +51,10 @@ const bucketTypeLabels = {
 
 export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }: TodoDialogProps) {
   const [categoryCreateError, setCategoryCreateError] = useState('')
-  const [newCategoryColorKey, setNewCategoryColorKey] = useState<CategoryColorKey>(DEFAULT_CATEGORY_COLOR_KEY)
-  const [newCategoryName, setNewCategoryName] = useState('')
+  const [categoryEditError, setCategoryEditError] = useState('')
   const createCategoryMutation = useCreateCategory()
   const createTodoMutation = useCreateTodo()
+  const updateCategoryMutation = useUpdateCategory()
   const { data: categories = [] } = useQuery(getCategoriesQueryOptions)
 
   const form = useAppForm({
@@ -66,7 +72,7 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
           })
           return undefined
         } catch (error) {
-          return { form: await getOperationErrorMessage(error) }
+          return { form: await getOperationErrorMessage(error, 'Could not save the todo.') }
         }
       },
     },
@@ -79,8 +85,7 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
     if (isOpen) {
       form.reset(getDefaultFormValues(defaultBucketId))
       setCategoryCreateError('')
-      setNewCategoryColorKey(DEFAULT_CATEGORY_COLOR_KEY)
-      setNewCategoryName('')
+      setCategoryEditError('')
     }
   }, [defaultBucketId, form, isOpen])
 
@@ -88,8 +93,8 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
     setOpen(open)
   }
 
-  const handleCreateCategory = async () => {
-    const name = newCategoryName.trim()
+  const handleCreateCategory = async (values: Pick<TodoFormValues, 'newCategoryColorKey' | 'newCategoryName'>) => {
+    const name = values.newCategoryName.trim()
 
     if (!name) {
       return
@@ -100,14 +105,43 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
     try {
       const category = await createCategoryMutation.mutateAsync({
         data: {
-          colorKey: newCategoryColorKey,
+          colorKey: values.newCategoryColorKey,
           name,
         },
       })
       form.setFieldValue('categoryId', String(category.id))
-      setNewCategoryName('')
+      form.setFieldValue('categoryEditColorKey', category.colorKey)
+      form.setFieldValue('categoryEditName', category.name)
+      form.setFieldValue('newCategoryName', '')
     } catch (error) {
-      setCategoryCreateError(await getOperationErrorMessage(error))
+      setCategoryCreateError(await getOperationErrorMessage(error, 'Could not create the category.'))
+    }
+  }
+
+  const handleUpdateCategory = async (
+    categoryId: number,
+    values: Pick<TodoFormValues, 'categoryEditColorKey' | 'categoryEditName'>,
+  ) => {
+    const name = values.categoryEditName.trim()
+
+    if (!name) {
+      return
+    }
+
+    setCategoryEditError('')
+
+    try {
+      const category = await updateCategoryMutation.mutateAsync({
+        data: {
+          colorKey: values.categoryEditColorKey,
+          id: categoryId,
+          name,
+        },
+      })
+      form.setFieldValue('categoryEditColorKey', category.colorKey)
+      form.setFieldValue('categoryEditName', category.name)
+    } catch (error) {
+      setCategoryEditError(await getOperationErrorMessage(error, 'Could not save the category.'))
     }
   }
 
@@ -223,7 +257,14 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
                     name={field.name}
                     onBlur={field.handleBlur}
                     onChange={(e) => {
+                      const category = categories.find((categoryOption) => String(categoryOption.id) === e.target.value)
+
                       field.handleChange(e.target.value)
+                      if (category) {
+                        form.setFieldValue('categoryEditColorKey', category.colorKey)
+                        form.setFieldValue('categoryEditName', category.name)
+                        setCategoryEditError('')
+                      }
                     }}
                     value={field.state.value}
                     className={cn(
@@ -240,43 +281,149 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
                 </Field>
               )}
             />
+            <form.Subscribe
+              selector={(state) => ({
+                categoryEditColorKey: state.values.categoryEditColorKey,
+                categoryEditName: state.values.categoryEditName,
+                categoryId: state.values.categoryId,
+              })}
+              children={({ categoryEditColorKey, categoryEditName, categoryId }) => {
+                const selectedCategory = categories.find((category) => String(category.id) === categoryId)
+
+                if (!selectedCategory) {
+                  return null
+                }
+
+                return (
+                  <Field className='gap-2'>
+                    <form.AppField
+                      name='categoryEditName'
+                      children={(field) => (
+                        <>
+                          <FieldLabel htmlFor={field.name}>Edit category name</FieldLabel>
+                          <Input
+                            autoComplete='off'
+                            id={field.name}
+                            name={field.name}
+                            onBlur={field.handleBlur}
+                            onChange={(event) => {
+                              field.handleChange(event.target.value)
+                            }}
+                            value={field.state.value}
+                          />
+                        </>
+                      )}
+                    />
+                    <form.AppField
+                      name='categoryEditColorKey'
+                      children={(field) => (
+                        <>
+                          <FieldLabel htmlFor={field.name}>Edit category color</FieldLabel>
+                          <select
+                            id={field.name}
+                            name={field.name}
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={(event) => {
+                              field.handleChange(event.target.value as CategoryColorKey)
+                            }}
+                            className={cn(
+                              'h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm',
+                            )}
+                          >
+                            {CATEGORY_COLOR_KEYS.map((colorKey) => (
+                              <option key={colorKey} value={colorKey}>
+                                {colorKey}
+                              </option>
+                            ))}
+                          </select>
+                        </>
+                      )}
+                    />
+                    <Button
+                      type='button'
+                      variant='secondary'
+                      onClick={() =>
+                        void handleUpdateCategory(selectedCategory.id, {
+                          categoryEditColorKey,
+                          categoryEditName,
+                        })
+                      }
+                      disabled={updateCategoryMutation.isPending || !categoryEditName.trim()}
+                    >
+                      Save category
+                    </Button>
+                    {categoryEditError && <FieldError className='text-xs font-medium'>{categoryEditError}</FieldError>}
+                  </Field>
+                )
+              }}
+            />
             <Field className='gap-2'>
               <FieldLabel htmlFor='new-category'>New category</FieldLabel>
               <div className='grid grid-cols-[1fr_auto] gap-2'>
-                <Input
-                  autoComplete='off'
-                  id='new-category'
-                  onChange={(event) => {
-                    setNewCategoryName(event.target.value)
-                  }}
-                  value={newCategoryName}
+                <form.AppField
+                  name='newCategoryName'
+                  children={(field) => (
+                    <Input
+                      autoComplete='off'
+                      id='new-category'
+                      name={field.name}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => {
+                        field.handleChange(event.target.value)
+                      }}
+                      value={field.state.value}
+                    />
+                  )}
                 />
-                <Button
-                  type='button'
-                  variant='secondary'
-                  onClick={handleCreateCategory}
-                  disabled={createCategoryMutation.isPending || !newCategoryName.trim()}
-                >
-                  Create category
-                </Button>
+                <form.Subscribe
+                  selector={(state) => ({
+                    newCategoryColorKey: state.values.newCategoryColorKey,
+                    newCategoryName: state.values.newCategoryName,
+                  })}
+                  children={({ newCategoryColorKey, newCategoryName }) => (
+                    <Button
+                      type='button'
+                      variant='secondary'
+                      onClick={() =>
+                        void handleCreateCategory({
+                          newCategoryColorKey,
+                          newCategoryName,
+                        })
+                      }
+                      disabled={createCategoryMutation.isPending || !newCategoryName.trim()}
+                    >
+                      Create category
+                    </Button>
+                  )}
+                />
               </div>
-              <FieldLabel htmlFor='new-category-color'>Category color</FieldLabel>
-              <select
-                id='new-category-color'
-                value={newCategoryColorKey}
-                onChange={(event) => {
-                  setNewCategoryColorKey(event.target.value as CategoryColorKey)
-                }}
-                className={cn(
-                  'h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm',
+              <form.AppField
+                name='newCategoryColorKey'
+                children={(field) => (
+                  <>
+                    <FieldLabel htmlFor='new-category-color'>Category color</FieldLabel>
+                    <select
+                      id='new-category-color'
+                      name={field.name}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => {
+                        field.handleChange(event.target.value as CategoryColorKey)
+                      }}
+                      className={cn(
+                        'h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm',
+                      )}
+                    >
+                      {CATEGORY_COLOR_KEYS.map((colorKey) => (
+                        <option key={colorKey} value={colorKey}>
+                          {colorKey}
+                        </option>
+                      ))}
+                    </select>
+                  </>
                 )}
-              >
-                {CATEGORY_COLOR_KEYS.map((colorKey) => (
-                  <option key={colorKey} value={colorKey}>
-                    {colorKey}
-                  </option>
-                ))}
-              </select>
+              />
               {categoryCreateError && <FieldError className='text-xs font-medium'>{categoryCreateError}</FieldError>}
             </Field>
             <form.AppForm>
@@ -301,21 +448,26 @@ function formatBucketName(bucket: BucketOption) {
 function getDefaultFormValues(defaultBucketId: number): TodoFormValues {
   return {
     bucketId: String(defaultBucketId),
+    categoryEditColorKey: DEFAULT_CATEGORY_COLOR_KEY,
+    categoryEditName: '',
     categoryId: '',
     description: '',
+    newCategoryColorKey: DEFAULT_CATEGORY_COLOR_KEY,
+    newCategoryName: '',
     title: '',
   }
 }
 
-async function getOperationErrorMessage(error: unknown) {
+async function getOperationErrorMessage(error: unknown, fallbackMessage: string) {
   if (error instanceof Response) {
-    const body = (await error.json().catch(() => undefined)) as { message?: string } | undefined
-    return body?.message ?? 'Could not save the todo.'
+    const json = await error.json().catch(() => undefined)
+    const body = operationErrorBodySchema.safeParse(json)
+    return body.success ? (body.data.message ?? fallbackMessage) : fallbackMessage
   }
 
   if (error instanceof Error) {
     return error.message
   }
 
-  return 'Could not save the todo.'
+  return fallbackMessage
 }
