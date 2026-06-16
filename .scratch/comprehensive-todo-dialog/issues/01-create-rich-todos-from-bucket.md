@@ -1,6 +1,6 @@
 # Create rich Todos from a Bucket
 
-Status: ready-for-agent
+Status: done
 
 ## What to build
 

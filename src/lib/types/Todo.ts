@@ -1,10 +1,13 @@
 import { z } from 'zod'
 
+import { CategoryDisplaySchema } from '@/lib/types/Category'
+
 export const TodoSchema = z.object({
   id: z.int(),
   title: z.string().min(1),
   description: z.string(),
-  category: z.string().optional(), // TODO make it a type / enum (maybe shared between client & server)
+  category: CategoryDisplaySchema.nullable(),
+  categoryId: z.int().nullable(),
   completed: z.boolean(),
   createdAt: z.date(),
   bucketId: z.int(),

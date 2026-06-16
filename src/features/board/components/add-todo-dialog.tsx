@@ -4,13 +4,18 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Field, FieldError, FieldLabel } from '@shared/components/ui/field'
 import { Input } from '@shared/components/ui/input'
 import { Textarea } from '@shared/components/ui/textarea'
-import { useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import z from 'zod'
 
+import useCreateCategory from '@/features/board/hooks/use-create-category'
 import useCreateTodo from '@/features/board/hooks/use-create-todo'
+import { getCategoriesQueryOptions } from '@/features/board/queries/category-queries'
 import { getErrorMessage as getFieldErrorMessage } from '@/features/shared/utils/form'
 import { cn } from '@/features/shared/utils/tailwind'
 import type { Bucket } from '@/lib/types/Bucket'
+import { CATEGORY_COLOR_KEYS, DEFAULT_CATEGORY_COLOR_KEY } from '@/lib/types/Category'
+import type { CategoryColorKey } from '@/lib/types/Category'
 
 type BucketOption = Pick<Bucket, 'id' | 'period' | 'type'>
 
@@ -23,6 +28,7 @@ interface TodoDialogProps {
 
 type TodoFormValues = {
   bucketId: string
+  categoryId: string
   description: string
   title: string
 }
@@ -38,7 +44,12 @@ const bucketTypeLabels = {
 } satisfies Record<BucketOption['type'], string>
 
 export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }: TodoDialogProps) {
+  const [categoryCreateError, setCategoryCreateError] = useState('')
+  const [newCategoryColorKey, setNewCategoryColorKey] = useState<CategoryColorKey>(DEFAULT_CATEGORY_COLOR_KEY)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const createCategoryMutation = useCreateCategory()
   const createTodoMutation = useCreateTodo()
+  const { data: categories = [] } = useQuery(getCategoriesQueryOptions)
 
   const form = useAppForm({
     defaultValues: getDefaultFormValues(defaultBucketId),
@@ -48,6 +59,7 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
           await createTodoMutation.mutateAsync({
             data: {
               bucketId: Number(value.bucketId),
+              categoryId: value.categoryId ? Number(value.categoryId) : null,
               description: value.description,
               title: value.title.trim(),
             },
@@ -66,11 +78,37 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
   useEffect(() => {
     if (isOpen) {
       form.reset(getDefaultFormValues(defaultBucketId))
+      setCategoryCreateError('')
+      setNewCategoryColorKey(DEFAULT_CATEGORY_COLOR_KEY)
+      setNewCategoryName('')
     }
   }, [defaultBucketId, form, isOpen])
 
   const handleOpenChange = (open: boolean) => {
     setOpen(open)
+  }
+
+  const handleCreateCategory = async () => {
+    const name = newCategoryName.trim()
+
+    if (!name) {
+      return
+    }
+
+    setCategoryCreateError('')
+
+    try {
+      const category = await createCategoryMutation.mutateAsync({
+        data: {
+          colorKey: newCategoryColorKey,
+          name,
+        },
+      })
+      form.setFieldValue('categoryId', String(category.id))
+      setNewCategoryName('')
+    } catch (error) {
+      setCategoryCreateError(await getOperationErrorMessage(error))
+    }
   }
 
   const formId = 'todo-dialog-form'
@@ -175,6 +213,72 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
                 </Field>
               )}
             />
+            <form.AppField
+              name='categoryId'
+              children={(field) => (
+                <Field className='gap-2'>
+                  <FieldLabel htmlFor={field.name}>Category</FieldLabel>
+                  <select
+                    id={field.name}
+                    name={field.name}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => {
+                      field.handleChange(e.target.value)
+                    }}
+                    value={field.state.value}
+                    className={cn(
+                      'h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm',
+                    )}
+                  >
+                    <option value=''>No category</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+            />
+            <Field className='gap-2'>
+              <FieldLabel htmlFor='new-category'>New category</FieldLabel>
+              <div className='grid grid-cols-[1fr_auto] gap-2'>
+                <Input
+                  autoComplete='off'
+                  id='new-category'
+                  onChange={(event) => {
+                    setNewCategoryName(event.target.value)
+                  }}
+                  value={newCategoryName}
+                />
+                <Button
+                  type='button'
+                  variant='secondary'
+                  onClick={handleCreateCategory}
+                  disabled={createCategoryMutation.isPending || !newCategoryName.trim()}
+                >
+                  Create category
+                </Button>
+              </div>
+              <FieldLabel htmlFor='new-category-color'>Category color</FieldLabel>
+              <select
+                id='new-category-color'
+                value={newCategoryColorKey}
+                onChange={(event) => {
+                  setNewCategoryColorKey(event.target.value as CategoryColorKey)
+                }}
+                className={cn(
+                  'h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm',
+                )}
+              >
+                {CATEGORY_COLOR_KEYS.map((colorKey) => (
+                  <option key={colorKey} value={colorKey}>
+                    {colorKey}
+                  </option>
+                ))}
+              </select>
+              {categoryCreateError && <FieldError className='text-xs font-medium'>{categoryCreateError}</FieldError>}
+            </Field>
             <form.AppForm>
               <form.FormErrorAlert />
             </form.AppForm>
@@ -197,6 +301,7 @@ function formatBucketName(bucket: BucketOption) {
 function getDefaultFormValues(defaultBucketId: number): TodoFormValues {
   return {
     bucketId: String(defaultBucketId),
+    categoryId: '',
     description: '',
     title: '',
   }

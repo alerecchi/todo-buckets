@@ -5,7 +5,7 @@ import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/neon-http'
 
 import * as schema from '../src/server/db/schema'
-import { accounts, buckets, todos, users } from '../src/server/db/schema'
+import { accounts, buckets, categories, todos, users } from '../src/server/db/schema'
 
 const databaseUrl = process.env.DATABASE_URL
 
@@ -41,13 +41,15 @@ async function main() {
 
   await seedAuthUsers(now)
   const seedBuckets = await seedPrimaryUserBuckets(now)
-  await seedPrimaryUserTodos(seedBuckets, now)
+  const seedCategories = await seedPrimaryUserCategories()
+  await seedPrimaryUserTodos(seedBuckets, seedCategories, now)
 
   console.log(
     [
       'Seed completed.',
       `Users: ${seedUsers.map((user) => `${user.email} / ${user.password}`).join(', ')}`,
       `Buckets: ${seedBuckets.length}`,
+      `Categories: ${seedCategories.length}`,
       'Todos: 25',
       shouldReset ? 'Database was reset before seeding.' : 'Database reset was skipped.',
     ].join('\n'),
@@ -56,7 +58,7 @@ async function main() {
 
 async function resetDatabase() {
   await db.execute(
-    sql`truncate table "todos", "buckets", "accounts", "sessions", "verifications", "users" restart identity cascade`,
+    sql`truncate table "todos", "categories", "buckets", "accounts", "sessions", "verifications", "users" restart identity cascade`,
   )
 }
 
@@ -127,14 +129,48 @@ async function seedPrimaryUserBuckets(now: Date) {
     .returning()
 }
 
-async function seedPrimaryUserTodos(seedBuckets: Array<typeof buckets.$inferSelect>, now: Date) {
+async function seedPrimaryUserCategories() {
+  return db
+    .insert(categories)
+    .values([
+      {
+        colorKey: 'blue',
+        name: 'work',
+        userId: 'seed-user-aaa',
+      },
+      {
+        colorKey: 'green',
+        name: 'home admin',
+        userId: 'seed-user-aaa',
+      },
+      {
+        colorKey: 'amber',
+        name: 'personal',
+        userId: 'seed-user-aaa',
+      },
+      {
+        colorKey: 'rose',
+        name: 'health',
+        userId: 'seed-user-aaa',
+      },
+    ])
+    .returning()
+}
+
+async function seedPrimaryUserTodos(
+  seedBuckets: Array<typeof buckets.$inferSelect>,
+  seedCategories: Array<typeof categories.$inferSelect>,
+  now: Date,
+) {
   await db.insert(todos).values(
     Array.from({ length: 25 }, (_, index) => {
       const todoIndex = index + 1
       const bucket = seedBuckets[index % seedBuckets.length]
+      const category = todoIndex <= 5 ? seedCategories[index % seedCategories.length] : undefined
 
       return {
         bucketId: bucket.id,
+        categoryId: category?.id ?? null,
         completed: false,
         createdAt: new Date(now.getTime() + todoIndex * 1000),
         description: `Seed todo description ${String(todoIndex).padStart(2, '0')}`,

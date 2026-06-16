@@ -1,11 +1,13 @@
 import { z } from 'zod'
 
-import type { BucketDb, TodoDbInsert, TodoDbSelect } from '@/server/db/types'
+import type { CategoryDisplay } from '@/lib/types/Category'
+import type { BucketDb, CategoryDbSelect, TodoDbInsert, TodoDbSelect } from '@/server/db/types'
 import { errorResponse } from '@/server/utils'
 
 export const CreateTodoInput = z
   .object({
     bucketId: z.int(),
+    categoryId: z.int().nullable().optional(),
     description: z.string().optional(),
     title: z.string().trim().min(1),
   })
@@ -20,6 +22,7 @@ export const GetTodosInput = z
 export const UpdateTodoInput = z
   .object({
     bucketId: z.int().optional(),
+    categoryId: z.int().nullable().optional(),
     completed: z.boolean().optional(),
     description: z.string().optional(),
     id: z.int(),
@@ -35,6 +38,7 @@ export const DeleteTodoInput = z
 
 type TodoWithBucket = TodoDbSelect & {
   bucket: BucketDb
+  category: CategoryDbSelect | null
 }
 
 export type DeletedTodo = {
@@ -42,12 +46,17 @@ export type DeletedTodo = {
   todoId: number
 }
 
+export type TodoWithCategoryDisplay = TodoDbSelect & {
+  category: CategoryDisplay | null
+}
+
 export type TodoRepository = {
   createTodo: (todo: TodoDbInsert) => Promise<TodoDbSelect>
   deleteTodo: (todoId: number, userId: string) => Promise<DeletedTodo | undefined>
   findOwnedActiveBucket: (userId: string, bucketId: number) => Promise<BucketDb | undefined>
+  findOwnedCategory: (userId: string, categoryId: number) => Promise<CategoryDbSelect | undefined>
   findOwnedTodoWithBucket: (userId: string, todoId: number) => Promise<TodoWithBucket | undefined>
-  getTodosByBucketForUser: (userId: string, bucketId: number) => Promise<Array<TodoDbSelect>>
+  getTodosByBucketForUser: (userId: string, bucketId: number) => Promise<Array<TodoWithCategoryDisplay>>
   updateTodo: (todoId: number, userId: string, updates: Partial<TodoDbInsert>) => Promise<TodoDbSelect | undefined>
 }
 
@@ -75,15 +84,19 @@ type DeleteTodoDependencies = OperationDependencies & {
 
 export async function createTodoForUser({ data, now = () => new Date(), repository, userId }: CreateTodoDependencies) {
   await requireOwnedActiveBucket(repository, userId, data.bucketId)
+  const category = await requireOwnedCategoryIfPresent(repository, userId, data.categoryId)
 
-  return repository.createTodo({
+  const todo = await repository.createTodo({
     bucketId: data.bucketId,
+    categoryId: data.categoryId ?? null,
     completed: false,
     createdAt: now(),
     description: data.description?.trim() ?? '',
     title: data.title,
     userId,
   })
+
+  return withCategoryDisplay(todo, category)
 }
 
 export async function getTodosForUser({ data, repository, userId }: GetTodosDependencies) {
@@ -106,9 +119,14 @@ export async function updateTodoForUser({ data, repository, userId }: UpdateTodo
   if (data.bucketId !== undefined && data.bucketId !== existingTodo.bucketId) {
     await requireOwnedActiveBucket(repository, userId, data.bucketId)
   }
+  const category =
+    data.categoryId === undefined
+      ? toCategoryDisplay(existingTodo.category)
+      : await requireOwnedCategoryIfPresent(repository, userId, data.categoryId)
 
   const updates = {
     bucketId: data.bucketId,
+    categoryId: data.categoryId,
     completed: data.completed,
     description: data.description?.trim(),
     title: data.title,
@@ -119,7 +137,7 @@ export async function updateTodoForUser({ data, repository, userId }: UpdateTodo
     throw errorResponse(404, 'Todo not found or unauthorized')
   }
 
-  return updatedTodo
+  return withCategoryDisplay(updatedTodo, category)
 }
 
 export async function deleteTodoForUser({ data, repository, userId }: DeleteTodoDependencies) {
@@ -140,6 +158,43 @@ async function requireOwnedActiveBucket(repository: TodoRepository, userId: stri
   }
 
   return bucket
+}
+
+async function requireOwnedCategoryIfPresent(
+  repository: TodoRepository,
+  userId: string,
+  categoryId: number | null | undefined,
+) {
+  if (categoryId === undefined || categoryId === null) {
+    return null
+  }
+
+  const category = await repository.findOwnedCategory(userId, categoryId)
+
+  if (!category) {
+    throw errorResponse(404, 'Category not found or unauthorized')
+  }
+
+  return toCategoryDisplay(category)
+}
+
+function withCategoryDisplay(todo: TodoDbSelect, category: CategoryDisplay | null): TodoWithCategoryDisplay {
+  return {
+    ...todo,
+    category,
+  }
+}
+
+function toCategoryDisplay(category: CategoryDbSelect | null): CategoryDisplay | null {
+  if (!category) {
+    return null
+  }
+
+  return {
+    colorKey: category.colorKey,
+    id: category.id,
+    name: category.name,
+  }
 }
 
 function removeUndefinedValues<T extends Record<string, unknown>>(values: T) {

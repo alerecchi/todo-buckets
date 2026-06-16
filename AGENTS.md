@@ -59,6 +59,7 @@ When folders contain code that is exported for other modules/components an `inde
 ## Task Readiness For Code Changes
 
 - `pnpm run build`, `pnpm run format` and `pnpm test` must pass before considering code changes completed.
+- When implementing a ticket execute a CodeRabbit review (use your skill and run commands outside the sandbox) on the uncommitted code and comments must be addressed. In case the user is asking follow up changes ask if you should run CodeRabbit or not. If running the CLI fails explain why.
 
 ## Agent skills
 

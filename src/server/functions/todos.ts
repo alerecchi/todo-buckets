@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, eq } from 'drizzle-orm'
 
 import { db } from '@/server/db/client'
-import { buckets, todos } from '@/server/db/schema/schema'
+import { buckets, categories, todos } from '@/server/db/schema/schema'
 import type { TodoDbInsert } from '@/server/db/types'
 import type { TodoRepository } from '@/server/functions/todos.core'
 import {
@@ -78,17 +78,33 @@ const todoRepository: TodoRepository = {
       where: and(eq(buckets.id, bucketId), eq(buckets.userId, userId), eq(buckets.status, 'active')),
     })
   },
+  findOwnedCategory(userId: string, categoryId: number) {
+    return db.query.categories.findFirst({
+      where: and(eq(categories.id, categoryId), eq(categories.userId, userId)),
+    })
+  },
   findOwnedTodoWithBucket(userId: string, todoId: number) {
     return db.query.todos.findFirst({
       where: and(eq(todos.id, todoId), eq(todos.userId, userId)),
-      with: { bucket: true },
+      with: {
+        bucket: true,
+        category: true,
+      },
     })
   },
   getTodosByBucketForUser(userId: string, bucketId: number) {
-    return db
-      .select()
-      .from(todos)
-      .where(and(eq(todos.bucketId, bucketId), eq(todos.userId, userId)))
+    return db.query.todos.findMany({
+      where: and(eq(todos.bucketId, bucketId), eq(todos.userId, userId)),
+      with: {
+        category: {
+          columns: {
+            colorKey: true,
+            id: true,
+            name: true,
+          },
+        },
+      },
+    })
   },
   async updateTodo(todoId: number, userId: string, updates: Partial<TodoDbInsert>) {
     const [updatedTodo] = await db
