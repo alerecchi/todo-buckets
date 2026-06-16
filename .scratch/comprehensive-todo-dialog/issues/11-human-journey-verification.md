@@ -1,6 +1,6 @@
 # Human journey verification for comprehensive Todo dialog
 
-Status: ready-for-human
+Status: done
 
 ## What to build
 

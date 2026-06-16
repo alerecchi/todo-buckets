@@ -527,6 +527,42 @@ describe('todo server behavior', () => {
     expect(repository.updateTodo).not.toHaveBeenCalled()
   })
 
+  it('deletes an owned Todo and returns its cache removal data', async () => {
+    const deletedTodo = {
+      bucketId: existingTodo.bucketId,
+      todoId: existingTodo.id,
+    }
+    const repository = createRepository({
+      deleteTodo: vi.fn(() => Promise.resolve(deletedTodo)),
+    })
+
+    await expect(
+      deleteTodoForUser({
+        data: { id: existingTodo.id },
+        repository,
+        userId: activeBucket.userId,
+      }),
+    ).resolves.toEqual(deletedTodo)
+
+    expect(repository.deleteTodo).toHaveBeenCalledWith(existingTodo.id, activeBucket.userId)
+  })
+
+  it('rejects deleting a nonexistent Todo', async () => {
+    const repository = createRepository({
+      deleteTodo: vi.fn(() => Promise.resolve(undefined)),
+    })
+
+    await expect(
+      deleteTodoForUser({
+        data: { id: existingTodo.id },
+        repository,
+        userId: activeBucket.userId,
+      }),
+    ).rejects.toHaveProperty('status', 404)
+
+    expect(repository.deleteTodo).toHaveBeenCalledWith(existingTodo.id, activeBucket.userId)
+  })
+
   it('deletes todos only when the todo belongs to the current user', async () => {
     const repository = createRepository({
       deleteTodo: vi.fn(() => Promise.resolve(undefined)),

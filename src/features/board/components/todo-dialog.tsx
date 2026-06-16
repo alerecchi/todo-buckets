@@ -13,6 +13,7 @@ import useCreateTag from '@/features/board/hooks/use-create-tag'
 import useCreateTodo from '@/features/board/hooks/use-create-todo'
 import useDeleteCategory from '@/features/board/hooks/use-delete-category'
 import useDeleteTag from '@/features/board/hooks/use-delete-tag'
+import useDeleteTodo from '@/features/board/hooks/use-delete-todo'
 import useUpdateCategory from '@/features/board/hooks/use-update-category'
 import useUpdateTag from '@/features/board/hooks/use-update-tag'
 import { useUpdateTodo } from '@/features/board/hooks/use-update-todo'
@@ -71,11 +72,13 @@ export default function TodoDialog({ buckets, defaultBucketId, editingTodo, isOp
   const [tagCreateError, setTagCreateError] = useState('')
   const [tagDeleteErrors, setTagDeleteErrors] = useState<Record<number, string>>({})
   const [tagEditErrors, setTagEditErrors] = useState<Record<number, string>>({})
+  const [todoDeleteError, setTodoDeleteError] = useState('')
   const createCategoryMutation = useCreateCategory()
   const createTagMutation = useCreateTag()
   const createTodoMutation = useCreateTodo()
   const deleteCategoryMutation = useDeleteCategory()
   const deleteTagMutation = useDeleteTag()
+  const deleteTodoMutation = useDeleteTodo()
   const updateCategoryMutation = useUpdateCategory()
   const updateTagMutation = useUpdateTag()
   const updateTodoMutation = useUpdateTodo()
@@ -132,6 +135,7 @@ export default function TodoDialog({ buckets, defaultBucketId, editingTodo, isOp
       setTagCreateError('')
       setTagDeleteErrors({})
       setTagEditErrors({})
+      setTodoDeleteError('')
     }
   }, [defaultBucketId, editingTodo, form, isOpen])
 
@@ -318,6 +322,31 @@ export default function TodoDialog({ buckets, defaultBucketId, editingTodo, isOp
       }
     } catch (error) {
       setCategoryDeleteError(await getOperationErrorMessage(error, 'Could not delete the category.'))
+    }
+  }
+
+  const handleDeleteTodo = async () => {
+    if (!editingTodo) {
+      return
+    }
+
+    const confirmed = window.confirm('Delete this todo? This cannot be undone.')
+
+    if (!confirmed) {
+      return
+    }
+
+    setTodoDeleteError('')
+
+    try {
+      await deleteTodoMutation.mutateAsync({
+        data: {
+          id: editingTodo.id,
+        },
+      })
+      setOpen(false)
+    } catch (error) {
+      setTodoDeleteError(await getOperationErrorMessage(error, 'Could not delete the todo.'))
     }
   }
 
@@ -793,12 +822,27 @@ export default function TodoDialog({ buckets, defaultBucketId, editingTodo, isOp
             <form.AppForm>
               <form.FormErrorAlert />
             </form.AppForm>
+            {todoDeleteError && <FieldError className='text-xs font-medium'>{todoDeleteError}</FieldError>}
           </div>
-          <DialogFooter className='shrink-0'>
+          <DialogFooter className='shrink-0 sm:justify-between'>
+            {isEditMode && (
+              <Button
+                type='button'
+                variant='destructive'
+                onClick={() => void handleDeleteTodo()}
+                disabled={deleteTodoMutation.isPending}
+              >
+                Delete todo
+              </Button>
+            )}
             <Button type='button' variant='secondary' onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type='submit' form={formId} disabled={createTodoMutation.isPending || updateTodoMutation.isPending}>
+            <Button
+              type='submit'
+              form={formId}
+              disabled={createTodoMutation.isPending || updateTodoMutation.isPending || deleteTodoMutation.isPending}
+            >
               {isEditMode ? 'Save changes' : 'Add'}
             </Button>
           </DialogFooter>
