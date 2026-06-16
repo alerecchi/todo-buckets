@@ -28,9 +28,8 @@ function TodoCard({ todo /* onRemoveTodo */ }: TodoCardProps) {
       className={cn(
         'group m-2 shadow-sm ring-0',
         todo.category &&
-          'border-l-4 border-l-(--todo-category-color) data-[completed=true]:border-l-[color-mix(in_oklab,var(--todo-category-color)_70%,transparent)]',
+          'border-l-4 border-l-(--todo-marker-bg) data-[completed=true]:border-l-[color-mix(in_oklab,var(--todo-marker-bg)_70%,transparent)]',
         categoryColor?.backgroundColorClass,
-        categoryColor?.textColorClass,
         todo.completed && 'bg-muted',
       )}
     >
@@ -47,15 +46,28 @@ function TodoCard({ todo /* onRemoveTodo */ }: TodoCardProps) {
             )}
           />
         </CardAction>
-        {todo.category && (
-          <Badge
-            className={cn(
-              'rounded-sm px-2.5 py-1 uppercase',
-              'bg-[color-mix(in_oklab,var(--todo-category-color)_12%,transparent)] text-(--todo-category-text)',
-            )}
-          >
-            {todo.category.name}
-          </Badge>
+        {todo.tags.length > 0 && (
+          <div className='flex flex-wrap gap-1.5'>
+            {todo.tags.map((tag) => {
+              const tagColor = getColorPreset(tag.colorKey)
+
+              return (
+                <Badge
+                  key={tag.id}
+                  data-completed={todo.completed}
+                  className={cn(
+                    'rounded-sm px-2 py-0.5 text-xs uppercase',
+                    'bg-[color-mix(in_oklab,var(--todo-marker-bg)_12%,transparent)] text-(--todo-marker-fg)',
+                    'data-[completed=true]:bg-[color-mix(in_oklab,var(--todo-marker-bg)_8%,transparent)] data-[completed=true]:text-muted-foreground',
+                    tagColor.backgroundColorClass,
+                    tagColor.textColorClass,
+                  )}
+                >
+                  {tag.name}
+                </Badge>
+              )
+            })}
+          </div>
         )}
         <CardTitle className={cn(!todo.completed && 'font-bold', todo.completed && 'font-semibold text-slate-500')}>
           {todo.title}

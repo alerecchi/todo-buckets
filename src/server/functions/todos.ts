@@ -1,9 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 
 import { db } from '@/server/db/client'
-import { buckets, categories, todos } from '@/server/db/schema/schema'
-import type { TodoDbInsert } from '@/server/db/types'
+import { buckets, categories, tags, todoTags, todos } from '@/server/db/schema/schema'
+import type { TagDbSelect, TodoDbInsert } from '@/server/db/types'
 import type { TodoRepository } from '@/server/functions/todos.core'
 import {
   CreateTodoInput,
@@ -83,17 +83,29 @@ const todoRepository: TodoRepository = {
       where: and(eq(categories.id, categoryId), eq(categories.userId, userId)),
     })
   },
-  findOwnedTodoWithBucket(userId: string, todoId: number) {
-    return db.query.todos.findFirst({
+  findOwnedTags(userId: string, tagIds: Array<number>) {
+    return db.query.tags.findMany({
+      where: and(eq(tags.userId, userId), inArray(tags.id, tagIds)),
+    })
+  },
+  async findOwnedTodoWithBucket(userId: string, todoId: number) {
+    const todo = await db.query.todos.findFirst({
       where: and(eq(todos.id, todoId), eq(todos.userId, userId)),
       with: {
         bucket: true,
         category: true,
+        todoTags: {
+          with: {
+            tag: true,
+          },
+        },
       },
     })
+
+    return todo ? withTags(todo) : undefined
   },
-  getTodosByBucketForUser(userId: string, bucketId: number) {
-    return db.query.todos.findMany({
+  async getTodosByBucketForUser(userId: string, bucketId: number) {
+    const bucketTodos = await db.query.todos.findMany({
       where: and(eq(todos.bucketId, bucketId), eq(todos.userId, userId)),
       with: {
         category: {
@@ -103,8 +115,41 @@ const todoRepository: TodoRepository = {
             name: true,
           },
         },
+        todoTags: {
+          with: {
+            tag: {
+              columns: {
+                colorKey: true,
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
       },
     })
+
+    return bucketTodos.map(withTags)
+  },
+  async replaceTodoTags(todoId: number, userId: string, tagIds: Array<number>) {
+    const ownedTodo = await db.query.todos.findFirst({
+      columns: {
+        id: true,
+      },
+      where: and(eq(todos.id, todoId), eq(todos.userId, userId)),
+    })
+
+    if (!ownedTodo) {
+      return
+    }
+
+    await db.delete(todoTags).where(eq(todoTags.todoId, todoId))
+
+    if (tagIds.length === 0) {
+      return
+    }
+
+    await db.insert(todoTags).values(tagIds.map((tagId) => ({ tagId, todoId })))
   },
   async updateTodo(todoId: number, userId: string, updates: Partial<TodoDbInsert>) {
     const [updatedTodo] = await db
@@ -114,4 +159,13 @@ const todoRepository: TodoRepository = {
       .returning()
     return updatedTodo
   },
+}
+
+function withTags<T extends { todoTags: Array<{ tag: Pick<TagDbSelect, 'colorKey' | 'id' | 'name'> }> }>(todo: T) {
+  const { todoTags: todoTagRows, ...todoWithoutJoinRows } = todo
+
+  return {
+    ...todoWithoutJoinRows,
+    tags: todoTagRows.map((todoTag) => todoTag.tag),
+  }
 }

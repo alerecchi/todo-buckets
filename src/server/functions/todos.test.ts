@@ -17,6 +17,20 @@ const ownedCategory = {
   userId: 'user-1',
 } as const
 
+const urgentTag = {
+  colorKey: 'rose',
+  id: 11,
+  name: 'urgent',
+  userId: 'user-1',
+} as const
+
+const focusTag = {
+  colorKey: 'teal',
+  id: 12,
+  name: 'focus',
+  userId: 'user-1',
+} as const
+
 const activeBucket = {
   id: 2,
   period: '2026-06-11',
@@ -41,6 +55,7 @@ const existingTodo = {
   createdAt: new Date('2026-06-10T08:00:00.000Z'),
   description: '',
   id: 10,
+  tags: [],
   title: 'Pay rent',
   userId: activeBucket.userId,
 }
@@ -50,8 +65,12 @@ const createRepository = (overrides: Partial<TodoRepository> = {}): TodoReposito
   deleteTodo: vi.fn(),
   findOwnedActiveBucket: vi.fn(() => Promise.resolve(activeBucket)),
   findOwnedCategory: vi.fn(() => Promise.resolve(ownedCategory)),
+  findOwnedTags: vi.fn((userId, tagIds) =>
+    Promise.resolve([urgentTag, focusTag].filter((tag) => tag.userId === userId && tagIds.includes(tag.id))),
+  ),
   findOwnedTodoWithBucket: vi.fn(),
   getTodosByBucketForUser: vi.fn(() => Promise.resolve([])),
+  replaceTodoTags: vi.fn(() => Promise.resolve()),
   updateTodo: vi.fn(),
   ...overrides,
 })
@@ -86,6 +105,7 @@ describe('todo server behavior', () => {
       bucketId: activeBucket.id,
       completed: false,
       description: 'Details to remember',
+      tags: [],
       title: 'Pay rent',
       userId: activeBucket.userId,
     })
@@ -122,6 +142,77 @@ describe('todo server behavior', () => {
 
     expect(repository.findOwnedCategory).toHaveBeenCalledWith(activeBucket.userId, ownedCategory.id)
     expect(repository.createTodo).toHaveBeenCalledWith(expect.objectContaining({ categoryId: ownedCategory.id }))
+  })
+
+  it('creates todos with an empty Tag set', async () => {
+    const repository = createRepository()
+
+    const createdTodo = await createTodoForUser({
+      data: CreateTodoInput.parse({
+        bucketId: activeBucket.id,
+        tagIds: [],
+        title: 'Pay rent',
+      }),
+      repository,
+      userId: activeBucket.userId,
+    })
+
+    expect(repository.findOwnedTags).not.toHaveBeenCalled()
+    expect(repository.replaceTodoTags).toHaveBeenCalledWith(existingTodo.id, activeBucket.userId, [])
+    expect(createdTodo.tags).toEqual([])
+  })
+
+  it('creates todos with owned Tags selected', async () => {
+    const repository = createRepository()
+
+    const createdTodo = await createTodoForUser({
+      data: CreateTodoInput.parse({
+        bucketId: activeBucket.id,
+        tagIds: [focusTag.id, urgentTag.id],
+        title: 'Pay rent',
+      }),
+      repository,
+      userId: activeBucket.userId,
+    })
+
+    expect(repository.findOwnedTags).toHaveBeenCalledWith(activeBucket.userId, [focusTag.id, urgentTag.id])
+    expect(repository.replaceTodoTags).toHaveBeenCalledWith(existingTodo.id, activeBucket.userId, [
+      focusTag.id,
+      urgentTag.id,
+    ])
+    expect(createdTodo.tags).toEqual([
+      {
+        colorKey: focusTag.colorKey,
+        id: focusTag.id,
+        name: focusTag.name,
+      },
+      {
+        colorKey: urgentTag.colorKey,
+        id: urgentTag.id,
+        name: urgentTag.name,
+      },
+    ])
+  })
+
+  it("rejects creating a Todo with another user's Tag", async () => {
+    const repository = createRepository({
+      findOwnedTags: vi.fn(() => Promise.resolve([urgentTag])),
+    })
+
+    await expect(
+      createTodoForUser({
+        data: {
+          bucketId: activeBucket.id,
+          tagIds: [urgentTag.id, focusTag.id],
+          title: 'Pay rent',
+        },
+        repository,
+        userId: activeBucket.userId,
+      }),
+    ).rejects.toHaveProperty('status', 404)
+
+    expect(repository.findOwnedTags).toHaveBeenCalledWith(activeBucket.userId, [urgentTag.id, focusTag.id])
+    expect(repository.createTodo).not.toHaveBeenCalled()
   })
 
   it("rejects creating a Todo with another user's Category", async () => {
@@ -164,6 +255,28 @@ describe('todo server behavior', () => {
 
     expect(repository.findOwnedCategory).toHaveBeenCalledWith(activeBucket.userId, ownedCategory.id)
     expect(repository.updateTodo).not.toHaveBeenCalled()
+  })
+
+  it("rejects updating a Todo to another user's Tag", async () => {
+    const repository = createRepository({
+      findOwnedTags: vi.fn(() => Promise.resolve([urgentTag])),
+      findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(existingTodo)),
+    })
+
+    await expect(
+      updateTodoForUser({
+        data: {
+          id: existingTodo.id,
+          tagIds: [urgentTag.id, focusTag.id],
+        },
+        repository,
+        userId: activeBucket.userId,
+      }),
+    ).rejects.toHaveProperty('status', 404)
+
+    expect(repository.findOwnedTags).toHaveBeenCalledWith(activeBucket.userId, [urgentTag.id, focusTag.id])
+    expect(repository.updateTodo).not.toHaveBeenCalled()
+    expect(repository.replaceTodoTags).not.toHaveBeenCalled()
   })
 
   it('rejects blank titles at the server function validation boundary', () => {
@@ -245,6 +358,81 @@ describe('todo server behavior', () => {
     ).rejects.toHaveProperty('status', 404)
 
     expect(repository.updateTodo).not.toHaveBeenCalled()
+  })
+
+  it('replaces the full submitted Tag set when updating a Todo', async () => {
+    const repository = createRepository({
+      findOwnedTodoWithBucket: vi.fn(() =>
+        Promise.resolve({
+          ...existingTodo,
+          tags: [urgentTag],
+        }),
+      ),
+      updateTodo: vi.fn((todoId, userId, updates) =>
+        Promise.resolve({
+          ...existingTodo,
+          ...updates,
+          id: todoId,
+          userId,
+        }),
+      ),
+    })
+
+    const updatedTodo = await updateTodoForUser({
+      data: {
+        id: existingTodo.id,
+        tagIds: [focusTag.id],
+      },
+      repository,
+      userId: activeBucket.userId,
+    })
+
+    expect(repository.replaceTodoTags).toHaveBeenCalledWith(existingTodo.id, activeBucket.userId, [focusTag.id])
+    expect(updatedTodo.tags).toEqual([
+      {
+        colorKey: focusTag.colorKey,
+        id: focusTag.id,
+        name: focusTag.name,
+      },
+    ])
+  })
+
+  it('preserves the existing Tag display data when update omits Tag IDs', async () => {
+    const repository = createRepository({
+      findOwnedTodoWithBucket: vi.fn(() =>
+        Promise.resolve({
+          ...existingTodo,
+          tags: [urgentTag],
+        }),
+      ),
+      updateTodo: vi.fn((todoId, userId, updates) =>
+        Promise.resolve({
+          ...existingTodo,
+          ...updates,
+          id: todoId,
+          userId,
+        }),
+      ),
+    })
+
+    const updatedTodo = await updateTodoForUser({
+      data: {
+        completed: true,
+        id: existingTodo.id,
+      },
+      repository,
+      userId: activeBucket.userId,
+    })
+
+    expect(repository.findOwnedTags).not.toHaveBeenCalled()
+    expect(repository.replaceTodoTags).not.toHaveBeenCalled()
+    expect(updatedTodo.tags).toEqual([
+      {
+        colorKey: urgentTag.colorKey,
+        id: urgentTag.id,
+        name: urgentTag.name,
+      },
+    ])
   })
 
   it('requires an active owned target bucket when moving todos', async () => {

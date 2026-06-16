@@ -9,15 +9,19 @@ import { useEffect, useState } from 'react'
 import z from 'zod'
 
 import useCreateCategory from '@/features/board/hooks/use-create-category'
+import useCreateTag from '@/features/board/hooks/use-create-tag'
 import useCreateTodo from '@/features/board/hooks/use-create-todo'
 import useDeleteCategory from '@/features/board/hooks/use-delete-category'
 import useUpdateCategory from '@/features/board/hooks/use-update-category'
 import { getCategoriesQueryOptions } from '@/features/board/queries/category-queries'
+import { getTagsQueryOptions } from '@/features/board/queries/tag-queries'
 import { getErrorMessage as getFieldErrorMessage } from '@/features/shared/utils/form'
 import { cn } from '@/features/shared/utils/tailwind'
 import type { Bucket } from '@/lib/types/Bucket'
 import { CATEGORY_COLOR_KEYS, DEFAULT_CATEGORY_COLOR_KEY } from '@/lib/types/Category'
 import type { CategoryColorKey } from '@/lib/types/Category'
+import { DEFAULT_TAG_COLOR_KEY, TAG_COLOR_KEYS } from '@/lib/types/Tag'
+import type { TagColorKey } from '@/lib/types/Tag'
 
 type BucketOption = Pick<Bucket, 'id' | 'period' | 'type'>
 
@@ -36,6 +40,9 @@ type TodoFormValues = {
   description: string
   newCategoryColorKey: CategoryColorKey
   newCategoryName: string
+  newTagColorKey: TagColorKey
+  newTagName: string
+  tagIds: Array<string>
   title: string
 }
 
@@ -54,11 +61,14 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
   const [categoryCreateError, setCategoryCreateError] = useState('')
   const [categoryDeleteError, setCategoryDeleteError] = useState('')
   const [categoryEditError, setCategoryEditError] = useState('')
+  const [tagCreateError, setTagCreateError] = useState('')
   const createCategoryMutation = useCreateCategory()
+  const createTagMutation = useCreateTag()
   const createTodoMutation = useCreateTodo()
   const deleteCategoryMutation = useDeleteCategory()
   const updateCategoryMutation = useUpdateCategory()
   const { data: categories = [] } = useQuery(getCategoriesQueryOptions)
+  const { data: tags = [] } = useQuery(getTagsQueryOptions)
 
   const form = useAppForm({
     defaultValues: getDefaultFormValues(defaultBucketId),
@@ -70,6 +80,7 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
               bucketId: Number(value.bucketId),
               categoryId: value.categoryId ? Number(value.categoryId) : null,
               description: value.description,
+              tagIds: value.tagIds.map(Number),
               title: value.title.trim(),
             },
           })
@@ -90,6 +101,7 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
       setCategoryCreateError('')
       setCategoryDeleteError('')
       setCategoryEditError('')
+      setTagCreateError('')
     }
   }, [defaultBucketId, form, isOpen])
 
@@ -119,6 +131,37 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
       form.setFieldValue('newCategoryName', '')
     } catch (error) {
       setCategoryCreateError(await getOperationErrorMessage(error, 'Could not create the category.'))
+    }
+  }
+
+  const handleTagSelectionChange = (tagId: string, selected: boolean, selectedTagIds: Array<string>) => {
+    const nextTagIds = selected
+      ? [...selectedTagIds, tagId]
+      : selectedTagIds.filter((selectedTagId) => selectedTagId !== tagId)
+
+    form.setFieldValue('tagIds', [...new Set(nextTagIds)])
+  }
+
+  const handleCreateTag = async (values: Pick<TodoFormValues, 'newTagColorKey' | 'newTagName' | 'tagIds'>) => {
+    const name = values.newTagName.trim()
+
+    if (!name) {
+      return
+    }
+
+    setTagCreateError('')
+
+    try {
+      const tag = await createTagMutation.mutateAsync({
+        data: {
+          colorKey: values.newTagColorKey,
+          name,
+        },
+      })
+      form.setFieldValue('tagIds', [...new Set([...values.tagIds, String(tag.id)])])
+      form.setFieldValue('newTagName', '')
+    } catch (error) {
+      setTagCreateError(await getOperationErrorMessage(error, 'Could not create the tag.'))
     }
   }
 
@@ -468,6 +511,111 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
               />
               {categoryCreateError && <FieldError className='text-xs font-medium'>{categoryCreateError}</FieldError>}
             </Field>
+            <form.AppField
+              name='tagIds'
+              children={(field) => (
+                <Field className='gap-2'>
+                  <FieldLabel>Tags</FieldLabel>
+                  <div className='flex flex-wrap gap-2'>
+                    {tags.length === 0 && <span className='text-sm text-muted-foreground'>No tags</span>}
+                    {tags.map((tag) => {
+                      const tagId = String(tag.id)
+                      const selected = field.state.value.includes(tagId)
+
+                      return (
+                        <label
+                          key={tag.id}
+                          className={cn(
+                            'inline-flex h-8 items-center gap-2 rounded-md border px-2 text-sm',
+                            selected && 'border-primary bg-primary/10',
+                          )}
+                        >
+                          <input
+                            type='checkbox'
+                            checked={selected}
+                            onBlur={field.handleBlur}
+                            onChange={(event) => {
+                              handleTagSelectionChange(tagId, event.target.checked, field.state.value)
+                            }}
+                          />
+                          {tag.name}
+                        </label>
+                      )
+                    })}
+                  </div>
+                </Field>
+              )}
+            />
+            <Field className='gap-2'>
+              <FieldLabel htmlFor='new-tag'>New tag</FieldLabel>
+              <div className='grid grid-cols-[1fr_auto] gap-2'>
+                <form.AppField
+                  name='newTagName'
+                  children={(field) => (
+                    <Input
+                      autoComplete='off'
+                      id='new-tag'
+                      name={field.name}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => {
+                        field.handleChange(event.target.value)
+                      }}
+                      value={field.state.value}
+                    />
+                  )}
+                />
+                <form.Subscribe
+                  selector={(state) => ({
+                    newTagColorKey: state.values.newTagColorKey,
+                    newTagName: state.values.newTagName,
+                    tagIds: state.values.tagIds,
+                  })}
+                  children={({ newTagColorKey, newTagName, tagIds }) => (
+                    <Button
+                      type='button'
+                      variant='secondary'
+                      onClick={() =>
+                        void handleCreateTag({
+                          newTagColorKey,
+                          newTagName,
+                          tagIds,
+                        })
+                      }
+                      disabled={createTagMutation.isPending || !newTagName.trim()}
+                    >
+                      Create tag
+                    </Button>
+                  )}
+                />
+              </div>
+              <form.AppField
+                name='newTagColorKey'
+                children={(field) => (
+                  <>
+                    <FieldLabel htmlFor='new-tag-color'>Tag color</FieldLabel>
+                    <select
+                      id='new-tag-color'
+                      name={field.name}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => {
+                        field.handleChange(event.target.value as TagColorKey)
+                      }}
+                      className={cn(
+                        'h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm',
+                      )}
+                    >
+                      {TAG_COLOR_KEYS.map((colorKey) => (
+                        <option key={colorKey} value={colorKey}>
+                          {colorKey}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              />
+              {tagCreateError && <FieldError className='text-xs font-medium'>{tagCreateError}</FieldError>}
+            </Field>
             <form.AppForm>
               <form.FormErrorAlert />
             </form.AppForm>
@@ -496,6 +644,9 @@ function getDefaultFormValues(defaultBucketId: number): TodoFormValues {
     description: '',
     newCategoryColorKey: DEFAULT_CATEGORY_COLOR_KEY,
     newCategoryName: '',
+    newTagColorKey: DEFAULT_TAG_COLOR_KEY,
+    newTagName: '',
+    tagIds: [],
     title: '',
   }
 }

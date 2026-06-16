@@ -18,7 +18,7 @@ The current stack is:
 - TanStack Start is the base as a full-stack React framework;
 - React compiler enabled;
 - TanStack Query for data fetching;
-- TanStack Form for forms;
+- TanStack Form, all form code MUST use TanStack Form to the fullest;
 - Better Auth for authentication;
 - Zod for validation;
 - Drizzle as a DB ORM (using a Neon backend)
@@ -55,11 +55,6 @@ The project has an opinionated structure that is feature-based but does not colo
 
 As this is a WIP project this project structure is subject to changes.
 When folders contain code that is exported for other modules/components an `index.ts` file should be added to improve dev experience.
-
-## Task Readiness For Code Changes
-
-- `pnpm run build`, `pnpm run format` and `pnpm test` must pass before considering code changes completed.
-- When implementing a ticket execute a CodeRabbit review (use your skill and run commands outside the sandbox) on the uncommitted code and comments must be addressed. In case the user is asking follow up changes ask if you should run CodeRabbit or not. If running the CLI fails explain why.
 
 ## Agent skills
 

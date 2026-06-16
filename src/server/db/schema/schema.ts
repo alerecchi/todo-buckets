@@ -2,11 +2,13 @@ import { relations } from 'drizzle-orm'
 import { boolean, integer, pgEnum, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 import { CATEGORY_COLOR_KEYS } from '../../../lib/types/Category'
+import { TAG_COLOR_KEYS } from '../../../lib/types/Tag'
 import { users } from './auth-schema'
 
 export const BucketStatus = pgEnum('bucket_status', ['active', 'archived'])
 export const BucketTypeEnum = pgEnum('bucket_type', ['inbox', 'yearly', 'monthly', 'weekly', 'daily'])
 export const CategoryColorKeyEnum = pgEnum('category_color_key', CATEGORY_COLOR_KEYS)
+export const TagColorKeyEnum = pgEnum('tag_color_key', TAG_COLOR_KEYS)
 
 export const buckets = pgTable('buckets', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -46,7 +48,33 @@ export const todos = pgTable('todos', {
     .notNull(),
 })
 
-export const todosRelations = relations(todos, ({ one }) => ({
+export const tags = pgTable(
+  'tags',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    name: text().notNull(),
+    colorKey: TagColorKeyEnum('color_key').notNull(),
+    userId: text('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+  },
+  (table) => [uniqueIndex('tags_user_id_name_unique').on(table.userId, table.name)],
+)
+
+export const todoTags = pgTable(
+  'todo_tags',
+  {
+    todoId: integer('todo_id')
+      .references(() => todos.id, { onDelete: 'cascade' })
+      .notNull(),
+    tagId: integer('tag_id')
+      .references(() => tags.id, { onDelete: 'cascade' })
+      .notNull(),
+  },
+  (table) => [uniqueIndex('todo_tags_todo_id_tag_id_unique').on(table.todoId, table.tagId)],
+)
+
+export const todosRelations = relations(todos, ({ many, one }) => ({
   bucket: one(buckets, {
     fields: [todos.bucketId],
     references: [buckets.id],
@@ -55,6 +83,7 @@ export const todosRelations = relations(todos, ({ one }) => ({
     fields: [todos.categoryId],
     references: [categories.id],
   }),
+  todoTags: many(todoTags),
 }))
 
 export const bucketsRelations = relations(buckets, ({ many }) => ({
@@ -63,4 +92,19 @@ export const bucketsRelations = relations(buckets, ({ many }) => ({
 
 export const categoriesRelations = relations(categories, ({ many }) => ({
   todos: many(todos),
+}))
+
+export const tagsRelations = relations(tags, ({ many }) => ({
+  todoTags: many(todoTags),
+}))
+
+export const todoTagsRelations = relations(todoTags, ({ one }) => ({
+  tag: one(tags, {
+    fields: [todoTags.tagId],
+    references: [tags.id],
+  }),
+  todo: one(todos, {
+    fields: [todoTags.todoId],
+    references: [todos.id],
+  }),
 }))

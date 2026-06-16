@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { CategoryDisplaySchema } from '@/lib/types/Category'
+import { TagDisplaySchema } from '@/lib/types/Tag'
 
 export const TodoSchema = z.object({
   id: z.int(),
@@ -11,6 +12,7 @@ export const TodoSchema = z.object({
   completed: z.boolean(),
   createdAt: z.date(),
   bucketId: z.int(),
+  tags: z.array(TagDisplaySchema),
 })
 
 export type Todo = z.infer<typeof TodoSchema>
