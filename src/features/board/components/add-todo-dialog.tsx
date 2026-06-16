@@ -10,6 +10,7 @@ import z from 'zod'
 
 import useCreateCategory from '@/features/board/hooks/use-create-category'
 import useCreateTodo from '@/features/board/hooks/use-create-todo'
+import useDeleteCategory from '@/features/board/hooks/use-delete-category'
 import useUpdateCategory from '@/features/board/hooks/use-update-category'
 import { getCategoriesQueryOptions } from '@/features/board/queries/category-queries'
 import { getErrorMessage as getFieldErrorMessage } from '@/features/shared/utils/form'
@@ -51,9 +52,11 @@ const bucketTypeLabels = {
 
 export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }: TodoDialogProps) {
   const [categoryCreateError, setCategoryCreateError] = useState('')
+  const [categoryDeleteError, setCategoryDeleteError] = useState('')
   const [categoryEditError, setCategoryEditError] = useState('')
   const createCategoryMutation = useCreateCategory()
   const createTodoMutation = useCreateTodo()
+  const deleteCategoryMutation = useDeleteCategory()
   const updateCategoryMutation = useUpdateCategory()
   const { data: categories = [] } = useQuery(getCategoriesQueryOptions)
 
@@ -85,6 +88,7 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
     if (isOpen) {
       form.reset(getDefaultFormValues(defaultBucketId))
       setCategoryCreateError('')
+      setCategoryDeleteError('')
       setCategoryEditError('')
     }
   }, [defaultBucketId, form, isOpen])
@@ -142,6 +146,32 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
       form.setFieldValue('categoryEditName', category.name)
     } catch (error) {
       setCategoryEditError(await getOperationErrorMessage(error, 'Could not save the category.'))
+    }
+  }
+
+  const handleDeleteCategory = async (categoryId: number, selectedCategoryId: string) => {
+    const confirmed = window.confirm('Delete this category? Todos using it will keep existing without a category.')
+
+    if (!confirmed) {
+      return
+    }
+
+    setCategoryDeleteError('')
+
+    try {
+      await deleteCategoryMutation.mutateAsync({
+        data: {
+          id: categoryId,
+        },
+      })
+
+      if (selectedCategoryId === String(categoryId)) {
+        form.setFieldValue('categoryId', '')
+        form.setFieldValue('categoryEditColorKey', DEFAULT_CATEGORY_COLOR_KEY)
+        form.setFieldValue('categoryEditName', '')
+      }
+    } catch (error) {
+      setCategoryDeleteError(await getOperationErrorMessage(error, 'Could not delete the category.'))
     }
   }
 
@@ -263,6 +293,7 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
                       if (category) {
                         form.setFieldValue('categoryEditColorKey', category.colorKey)
                         form.setFieldValue('categoryEditName', category.name)
+                        setCategoryDeleteError('')
                         setCategoryEditError('')
                       }
                     }}
@@ -353,6 +384,17 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
                     >
                       Save category
                     </Button>
+                    <Button
+                      type='button'
+                      variant='secondary'
+                      onClick={() => void handleDeleteCategory(selectedCategory.id, categoryId)}
+                      disabled={deleteCategoryMutation.isPending}
+                    >
+                      Delete category
+                    </Button>
+                    {categoryDeleteError && (
+                      <FieldError className='text-xs font-medium'>{categoryDeleteError}</FieldError>
+                    )}
                     {categoryEditError && <FieldError className='text-xs font-medium'>{categoryEditError}</FieldError>}
                   </Field>
                 )

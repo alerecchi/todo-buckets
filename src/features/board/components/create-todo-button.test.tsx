@@ -3,12 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import CreateTodoButton from '@/features/board/components/create-todo-button'
 import { CATEGORIES_QUERY_KEY, TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
-import { createCategory, listCategories, updateCategory } from '@/server/functions/categories'
+import { createCategory, deleteCategory, listCategories, updateCategory } from '@/server/functions/categories'
 import { createTodo } from '@/server/functions/todos'
 import { createTestQueryClient, render } from '@/test'
 
 vi.mock('@/server/functions/categories', () => ({
   createCategory: vi.fn(),
+  deleteCategory: vi.fn(),
   listCategories: vi.fn(() => Promise.resolve([])),
   updateCategory: vi.fn(),
 }))
@@ -65,12 +66,14 @@ const createdCategory = {
 
 const mockedCreateTodo = vi.mocked(createTodo)
 const mockedCreateCategory = vi.mocked(createCategory)
+const mockedDeleteCategory = vi.mocked(deleteCategory)
 const mockedListCategories = vi.mocked(listCategories)
 const mockedUpdateCategory = vi.mocked(updateCategory)
 
 describe('CreateTodoButton', () => {
   beforeEach(() => {
     mockedCreateCategory.mockReset()
+    mockedDeleteCategory.mockReset()
     mockedListCategories.mockReset()
     mockedListCategories.mockResolvedValue([])
     mockedUpdateCategory.mockReset()
@@ -273,6 +276,81 @@ describe('CreateTodoButton', () => {
     expect(await screen.findByText('Category name already exists')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
     expect(mockedCreateTodo).not.toHaveBeenCalled()
+  })
+
+  it('deletes the selected Category after confirmation and clears cached Todo card categories without submitting', async () => {
+    mockedListCategories.mockResolvedValue([createdCategory])
+    mockedDeleteCategory.mockResolvedValue({
+      categoryId: createdCategory.id,
+      userId: 'user-1',
+    })
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([CATEGORIES_QUERY_KEY], [createdCategory])
+    queryClient.setQueryData(
+      [TODOS_QUERY_KEY, 1],
+      [
+        {
+          ...existingTodo,
+          category: {
+            colorKey: createdCategory.colorKey,
+            id: createdCategory.id,
+            name: createdCategory.name,
+          },
+          categoryId: createdCategory.id,
+        },
+      ],
+    )
+
+    render(<CreateTodoButton bucketId={1} buckets={buckets} />, { queryClient })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+    expect(await screen.findByRole('option', { name: createdCategory.name })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Category'), { target: { value: String(createdCategory.id) } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete category' }))
+
+    await waitFor(() => {
+      expect(mockedDeleteCategory).toHaveBeenCalled()
+    })
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'Delete this category? Todos using it will keep existing without a category.',
+    )
+    expect(mockedDeleteCategory.mock.calls[0]?.[0]).toEqual({
+      data: {
+        id: createdCategory.id,
+      },
+    })
+    expect(mockedCreateTodo).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Category')).toHaveValue('')
+    expect(queryClient.getQueryData([CATEGORIES_QUERY_KEY])).toEqual([])
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, 1])).toEqual([
+      expect.objectContaining({
+        category: null,
+        categoryId: null,
+      }),
+    ])
+
+    confirmSpy.mockRestore()
+  })
+
+  it('keeps Category delete errors local to the picker', async () => {
+    mockedListCategories.mockResolvedValue([createdCategory])
+    mockedDeleteCategory.mockRejectedValue(new Error('Could not delete the category.'))
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    render(<CreateTodoButton bucketId={1} buckets={buckets} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+    expect(await screen.findByRole('option', { name: createdCategory.name })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Category'), { target: { value: String(createdCategory.id) } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete category' }))
+
+    expect(await screen.findByText('Could not delete the category.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Category')).toHaveValue(String(createdCategory.id))
+    expect(mockedCreateTodo).not.toHaveBeenCalled()
+
+    confirmSpy.mockRestore()
   })
 
   it('rejects missing title and missing bucket before saving', async () => {

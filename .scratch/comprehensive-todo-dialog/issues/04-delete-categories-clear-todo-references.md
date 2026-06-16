@@ -1,6 +1,6 @@
 # Delete Categories and clear Todo references
 
-Status: ready-for-agent
+Status: done
 
 ## What to build
 
