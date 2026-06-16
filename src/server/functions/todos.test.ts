@@ -341,6 +341,15 @@ describe('todo server behavior', () => {
     ).toBe(false)
   })
 
+  it('rejects blank titles at the update validation boundary', () => {
+    expect(
+      UpdateTodoInput.safeParse({
+        id: existingTodo.id,
+        title: '   ',
+      }).success,
+    ).toBe(false)
+  })
+
   it('updates todos only when the todo belongs to the current user', async () => {
     const repository = createRepository({
       findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(undefined)),

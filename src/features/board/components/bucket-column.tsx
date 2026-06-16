@@ -1,13 +1,16 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Inbox, ListTodo, Map, Mountain, Signpost } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useState } from 'react'
 
 import AddTodoButton from '@/features/board/components/create-todo-button'
 import TodoCard from '@/features/board/components/todo-card'
+import TodoDialog from '@/features/board/components/todo-dialog'
 import { getTodosQueryOptions } from '@/features/board/queries/todo-queries'
 import { Badge } from '@/features/shared/components/ui/badge'
 import { cn } from '@/features/shared/utils/tailwind'
 import type { Bucket, BucketType } from '@/lib/types/Bucket'
+import type { Todo } from '@/lib/types/Todo'
 
 interface BucketProps {
   bucket: Bucket
@@ -17,6 +20,7 @@ interface BucketProps {
 // TODO order for todos
 export function BucketColumn({ bucket, buckets }: BucketProps) {
   const { data: todoList = [] } = useSuspenseQuery(getTodosQueryOptions(bucket.id))
+  const [editingTodo, setEditingTodo] = useState<Todo | null>(null)
   const { icon: Icon, textColor, bgColor } = bucketStyles[bucket.type]
 
   return (
@@ -31,9 +35,25 @@ export function BucketColumn({ bucket, buckets }: BucketProps) {
       </div>
       <div className='flex flex-auto flex-col rounded-lg bg-secondary'>
         {todoList.map((todoItem) => (
-          <TodoCard key={todoItem.id} todo={todoItem} /* onRemoveTodo={onRemoveTodo} onToggleTodo={onToggleTodo} */ />
+          <TodoCard
+            key={todoItem.id}
+            todo={todoItem}
+            onEdit={setEditingTodo}
+            /* onRemoveTodo={onRemoveTodo} onToggleTodo={onToggleTodo} */
+          />
         ))}
       </div>
+      <TodoDialog
+        buckets={buckets}
+        defaultBucketId={bucket.id}
+        editingTodo={editingTodo}
+        isOpen={editingTodo !== null}
+        setOpen={(open) => {
+          if (!open) {
+            setEditingTodo(null)
+          }
+        }}
+      />
     </div>
   )
 }
