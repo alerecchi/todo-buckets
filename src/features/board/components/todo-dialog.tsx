@@ -15,6 +15,7 @@ import useDeleteCategory from '@/features/board/hooks/use-delete-category'
 import useDeleteTag from '@/features/board/hooks/use-delete-tag'
 import useUpdateCategory from '@/features/board/hooks/use-update-category'
 import useUpdateTag from '@/features/board/hooks/use-update-tag'
+import { useUpdateTodo } from '@/features/board/hooks/use-update-todo'
 import { getCategoriesQueryOptions } from '@/features/board/queries/category-queries'
 import { getTagsQueryOptions } from '@/features/board/queries/tag-queries'
 import { getErrorMessage as getFieldErrorMessage } from '@/features/shared/utils/form'
@@ -24,12 +25,14 @@ import { CATEGORY_COLOR_KEYS, DEFAULT_CATEGORY_COLOR_KEY } from '@/lib/types/Cat
 import type { CategoryColorKey } from '@/lib/types/Category'
 import { DEFAULT_TAG_COLOR_KEY, TAG_COLOR_KEYS } from '@/lib/types/Tag'
 import type { TagColorKey } from '@/lib/types/Tag'
+import type { Todo } from '@/lib/types/Todo'
 
 type BucketOption = Pick<Bucket, 'id' | 'period' | 'type'>
 
 interface TodoDialogProps {
   buckets: ReadonlyArray<BucketOption>
   defaultBucketId: number
+  editingTodo?: Todo | null
   isOpen: boolean
   setOpen: (open: boolean) => void
 }
@@ -61,7 +64,7 @@ const bucketTypeLabels = {
   yearly: 'Yearly',
 } satisfies Record<BucketOption['type'], string>
 
-export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }: TodoDialogProps) {
+export default function TodoDialog({ buckets, defaultBucketId, editingTodo, isOpen, setOpen }: TodoDialogProps) {
   const [categoryCreateError, setCategoryCreateError] = useState('')
   const [categoryDeleteError, setCategoryDeleteError] = useState('')
   const [categoryEditError, setCategoryEditError] = useState('')
@@ -75,23 +78,39 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
   const deleteTagMutation = useDeleteTag()
   const updateCategoryMutation = useUpdateCategory()
   const updateTagMutation = useUpdateTag()
+  const updateTodoMutation = useUpdateTodo()
   const { data: categories = [] } = useQuery(getCategoriesQueryOptions)
   const { data: tags = [] } = useQuery(getTagsQueryOptions)
+  const isEditMode = Boolean(editingTodo)
 
   const form = useAppForm({
-    defaultValues: getDefaultFormValues(defaultBucketId),
+    defaultValues: getDefaultFormValues(defaultBucketId, editingTodo),
     validators: {
       onSubmitAsync: async ({ value }) => {
         try {
-          await createTodoMutation.mutateAsync({
-            data: {
-              bucketId: Number(value.bucketId),
-              categoryId: value.categoryId ? Number(value.categoryId) : null,
-              description: value.description,
-              tagIds: value.tagIds.map(Number),
-              title: value.title.trim(),
-            },
-          })
+          const todoData = {
+            categoryId: value.categoryId ? Number(value.categoryId) : null,
+            description: value.description,
+            tagIds: value.tagIds.map(Number),
+            title: value.title.trim(),
+          }
+
+          if (editingTodo) {
+            await updateTodoMutation.mutateAsync({
+              data: {
+                ...todoData,
+                id: editingTodo.id,
+              },
+              oldBucketId: editingTodo.bucketId,
+            })
+          } else {
+            await createTodoMutation.mutateAsync({
+              data: {
+                ...todoData,
+                bucketId: Number(value.bucketId),
+              },
+            })
+          }
           return undefined
         } catch (error) {
           return { form: await getOperationErrorMessage(error, 'Could not save the todo.') }
@@ -105,7 +124,7 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
 
   useEffect(() => {
     if (isOpen) {
-      form.reset(getDefaultFormValues(defaultBucketId))
+      form.reset(getDefaultFormValues(defaultBucketId, editingTodo))
       setCategoryCreateError('')
       setCategoryDeleteError('')
       setCategoryEditError('')
@@ -113,7 +132,7 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
       setTagDeleteErrors({})
       setTagEditErrors({})
     }
-  }, [defaultBucketId, form, isOpen])
+  }, [defaultBucketId, editingTodo, form, isOpen])
 
   const handleOpenChange = (open: boolean) => {
     setOpen(open)
@@ -315,7 +334,7 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
           }}
         >
           <DialogHeader>
-            <DialogTitle>Add New Task</DialogTitle>
+            <DialogTitle>{isEditMode ? 'Edit Task' : 'Add New Task'}</DialogTitle>
           </DialogHeader>
           <div className='my-4 grid gap-4'>
             <form.AppField
@@ -382,6 +401,7 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
                     onChange={(e) => {
                       field.handleChange(e.target.value)
                     }}
+                    disabled={isEditMode}
                     value={field.state.value}
                     className={cn(
                       'h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm',
@@ -774,8 +794,11 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
             </form.AppForm>
           </div>
           <DialogFooter>
-            <Button type='submit' form={formId} disabled={createTodoMutation.isPending}>
-              Add
+            <Button type='button' variant='secondary' onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type='submit' form={formId} disabled={createTodoMutation.isPending || updateTodoMutation.isPending}>
+              {isEditMode ? 'Save changes' : 'Add'}
             </Button>
           </DialogFooter>
         </form>
@@ -788,21 +811,21 @@ function formatBucketName(bucket: BucketOption) {
   return `${bucketTypeLabels[bucket.type]} - ${bucket.period}`
 }
 
-function getDefaultFormValues(defaultBucketId: number): TodoFormValues {
+function getDefaultFormValues(defaultBucketId: number, editingTodo?: Todo | null): TodoFormValues {
   return {
-    bucketId: String(defaultBucketId),
-    categoryEditColorKey: DEFAULT_CATEGORY_COLOR_KEY,
-    categoryEditName: '',
-    categoryId: '',
-    description: '',
+    bucketId: String(editingTodo?.bucketId ?? defaultBucketId),
+    categoryEditColorKey: editingTodo?.category?.colorKey ?? DEFAULT_CATEGORY_COLOR_KEY,
+    categoryEditName: editingTodo?.category?.name ?? '',
+    categoryId: editingTodo?.categoryId ? String(editingTodo.categoryId) : '',
+    description: editingTodo?.description ?? '',
     newCategoryColorKey: DEFAULT_CATEGORY_COLOR_KEY,
     newCategoryName: '',
     newTagColorKey: DEFAULT_TAG_COLOR_KEY,
     newTagName: '',
-    tagEditColorKeys: {},
-    tagEditNames: {},
-    tagIds: [],
-    title: '',
+    tagEditColorKeys: Object.fromEntries(editingTodo?.tags.map((tag) => [String(tag.id), tag.colorKey]) ?? []),
+    tagEditNames: Object.fromEntries(editingTodo?.tags.map((tag) => [String(tag.id), tag.name]) ?? []),
+    tagIds: editingTodo?.tags.map((tag) => String(tag.id)) ?? [],
+    title: editingTodo?.title ?? '',
   }
 }
 

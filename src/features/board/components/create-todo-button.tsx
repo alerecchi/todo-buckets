@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
 
-import TodoDialog from '@/features/board/components/add-todo-dialog'
+import TodoDialog from '@/features/board/components/todo-dialog'
 import { Button } from '@/features/shared/components/ui/button'
 import type { Bucket } from '@/lib/types/Bucket'
 

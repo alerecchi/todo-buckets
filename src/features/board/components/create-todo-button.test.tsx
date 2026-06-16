@@ -5,7 +5,7 @@ import CreateTodoButton from '@/features/board/components/create-todo-button'
 import { CATEGORIES_QUERY_KEY, TAGS_QUERY_KEY, TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
 import { createCategory, deleteCategory, listCategories, updateCategory } from '@/server/functions/categories'
 import { createTag, deleteTag, listTags, updateTag } from '@/server/functions/tags'
-import { createTodo } from '@/server/functions/todos'
+import { createTodo, updateTodo } from '@/server/functions/todos'
 import { createTestQueryClient, render } from '@/test'
 
 vi.mock('@/server/functions/categories', () => ({
@@ -17,6 +17,7 @@ vi.mock('@/server/functions/categories', () => ({
 
 vi.mock('@/server/functions/todos', () => ({
   createTodo: vi.fn(),
+  updateTodo: vi.fn(),
 }))
 
 vi.mock('@/server/functions/tags', () => ({
@@ -89,6 +90,7 @@ const createdTag = {
 } as const
 
 const mockedCreateTodo = vi.mocked(createTodo)
+const mockedUpdateTodo = vi.mocked(updateTodo)
 const mockedCreateCategory = vi.mocked(createCategory)
 const mockedDeleteCategory = vi.mocked(deleteCategory)
 const mockedListCategories = vi.mocked(listCategories)
@@ -111,6 +113,7 @@ describe('CreateTodoButton', () => {
     mockedUpdateTag.mockReset()
     mockedUpdateCategory.mockReset()
     mockedCreateTodo.mockReset()
+    mockedUpdateTodo.mockReset()
   })
 
   it('opens TodoDialog create mode with the current bucket selected', () => {

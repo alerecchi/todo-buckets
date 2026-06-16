@@ -9,12 +9,13 @@ import { getColorPreset } from '@/lib/types/Color'
 import type { Todo } from '@/lib/types/Todo'
 
 interface TodoCardProps {
+  onEdit?: (todo: Todo) => void
   todo: Todo
   // onRemoveTodo: (todoId: number) => void
 }
 
 // TODO: implement drag and drop
-function TodoCard({ todo /* onRemoveTodo */ }: TodoCardProps) {
+function TodoCard({ onEdit, todo /* onRemoveTodo */ }: TodoCardProps) {
   const shouldShowDescription = !todo.completed && todo.description
   const categoryColor = todo.category ? getColorPreset(todo.category.colorKey) : undefined
   const { mutate: toggleTodoMutation } = useToggleTodo()
@@ -25,8 +26,16 @@ function TodoCard({ todo /* onRemoveTodo */ }: TodoCardProps) {
   return (
     <Card
       data-completed={todo.completed}
+      onClick={(event) => {
+        if (isTodoCardControl(event.target)) {
+          return
+        }
+
+        onEdit?.(todo)
+      }}
       className={cn(
         'group m-2 shadow-sm ring-0',
+        onEdit && 'cursor-pointer',
         todo.category &&
           'border-l-4 border-l-(--todo-marker-bg) data-[completed=true]:border-l-[color-mix(in_oklab,var(--todo-marker-bg)_70%,transparent)]',
         categoryColor?.backgroundColorClass,
@@ -38,6 +47,7 @@ function TodoCard({ todo /* onRemoveTodo */ }: TodoCardProps) {
           <Checkbox
             id={`terms-checkbox-${todo.id}`}
             checked={todo.completed}
+            onClick={(event) => event.stopPropagation()}
             onCheckedChange={handleCheckedChange}
             className={cn(
               'size-5 cursor-pointer rounded-full border-2',
@@ -79,3 +89,9 @@ function TodoCard({ todo /* onRemoveTodo */ }: TodoCardProps) {
 }
 
 export default memo(TodoCard)
+
+function isTodoCardControl(target: EventTarget) {
+  return (
+    target instanceof HTMLElement && Boolean(target.closest('[data-slot="checkbox"], input, button, select, textarea'))
+  )
+}
