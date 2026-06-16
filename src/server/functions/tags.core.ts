@@ -3,6 +3,13 @@ import { z } from 'zod'
 import type { TagDisplay } from '@/lib/types/Tag'
 import { TagColorKeySchema } from '@/lib/types/Tag'
 import type { TagDbInsert, TagDbSelect } from '@/server/db/types'
+import { errorResponse } from '@/server/utils'
+
+export class TagNameConflictError extends Error {
+  constructor() {
+    super('Tag name already exists')
+  }
+}
 
 const tagNameSchema = z
   .string()
@@ -19,9 +26,23 @@ export const CreateTagInput = z
   })
   .strict()
 
+export const UpdateTagInput = z
+  .object({
+    colorKey: TagColorKeySchema,
+    id: z.number().int(),
+    name: tagNameSchema,
+  })
+  .strict()
+
 export type TagRepository = {
   createTag: (tag: TagDbInsert) => Promise<TagDbSelect>
+  findTagByName: (userId: string, name: string) => Promise<TagDbSelect | undefined>
   listTagsForUser: (userId: string) => Promise<Array<TagDbSelect>>
+  updateTag: (
+    tagId: number,
+    userId: string,
+    updates: Pick<TagDbInsert, 'colorKey' | 'name'>,
+  ) => Promise<TagDbSelect | undefined>
 }
 
 type CreateTagDependencies = {
@@ -31,6 +52,12 @@ type CreateTagDependencies = {
 }
 
 type ListTagsDependencies = {
+  repository: TagRepository
+  userId: string
+}
+
+type UpdateTagDependencies = {
+  data: z.output<typeof UpdateTagInput>
   repository: TagRepository
   userId: string
 }
@@ -49,6 +76,33 @@ export async function listTagsForUser({ repository, userId }: ListTagsDependenci
   const tags = await repository.listTagsForUser(userId)
 
   return tags.map(toTagDisplay)
+}
+
+export async function updateTagForUser({ data, repository, userId }: UpdateTagDependencies) {
+  const tagWithName = await repository.findTagByName(userId, data.name)
+
+  if (tagWithName && tagWithName.id !== data.id) {
+    throw errorResponse(409, 'Tag name already exists')
+  }
+
+  const tag = await repository
+    .updateTag(data.id, userId, {
+      colorKey: data.colorKey,
+      name: data.name,
+    })
+    .catch((error: unknown) => {
+      if (error instanceof TagNameConflictError) {
+        throw errorResponse(409, error.message)
+      }
+
+      throw error
+    })
+
+  if (!tag) {
+    throw errorResponse(404, 'Tag not found or unauthorized')
+  }
+
+  return toTagDisplay(tag)
 }
 
 export function normalizeTagName(name: string) {
