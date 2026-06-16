@@ -34,8 +34,20 @@ export const UpdateTagInput = z
   })
   .strict()
 
+export const DeleteTagInput = z
+  .object({
+    id: z.number().int(),
+  })
+  .strict()
+
+export type DeletedTag = {
+  tagId: number
+  userId: string
+}
+
 export type TagRepository = {
   createTag: (tag: TagDbInsert) => Promise<TagDbSelect>
+  deleteTag: (tagId: number, userId: string) => Promise<DeletedTag | undefined>
   findTagByName: (userId: string, name: string) => Promise<TagDbSelect | undefined>
   listTagsForUser: (userId: string) => Promise<Array<TagDbSelect>>
   updateTag: (
@@ -58,6 +70,12 @@ type ListTagsDependencies = {
 
 type UpdateTagDependencies = {
   data: z.output<typeof UpdateTagInput>
+  repository: TagRepository
+  userId: string
+}
+
+type DeleteTagDependencies = {
+  data: z.output<typeof DeleteTagInput>
   repository: TagRepository
   userId: string
 }
@@ -103,6 +121,16 @@ export async function updateTagForUser({ data, repository, userId }: UpdateTagDe
   }
 
   return toTagDisplay(tag)
+}
+
+export async function deleteTagForUser({ data, repository, userId }: DeleteTagDependencies) {
+  const deletedTag = await repository.deleteTag(data.id, userId)
+
+  if (!deletedTag) {
+    throw errorResponse(404, 'Tag not found or unauthorized')
+  }
+
+  return deletedTag
 }
 
 export function normalizeTagName(name: string) {

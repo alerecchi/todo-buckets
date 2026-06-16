@@ -12,6 +12,7 @@ import useCreateCategory from '@/features/board/hooks/use-create-category'
 import useCreateTag from '@/features/board/hooks/use-create-tag'
 import useCreateTodo from '@/features/board/hooks/use-create-todo'
 import useDeleteCategory from '@/features/board/hooks/use-delete-category'
+import useDeleteTag from '@/features/board/hooks/use-delete-tag'
 import useUpdateCategory from '@/features/board/hooks/use-update-category'
 import useUpdateTag from '@/features/board/hooks/use-update-tag'
 import { getCategoriesQueryOptions } from '@/features/board/queries/category-queries'
@@ -65,11 +66,13 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
   const [categoryDeleteError, setCategoryDeleteError] = useState('')
   const [categoryEditError, setCategoryEditError] = useState('')
   const [tagCreateError, setTagCreateError] = useState('')
+  const [tagDeleteErrors, setTagDeleteErrors] = useState<Record<number, string>>({})
   const [tagEditErrors, setTagEditErrors] = useState<Record<number, string>>({})
   const createCategoryMutation = useCreateCategory()
   const createTagMutation = useCreateTag()
   const createTodoMutation = useCreateTodo()
   const deleteCategoryMutation = useDeleteCategory()
+  const deleteTagMutation = useDeleteTag()
   const updateCategoryMutation = useUpdateCategory()
   const updateTagMutation = useUpdateTag()
   const { data: categories = [] } = useQuery(getCategoriesQueryOptions)
@@ -107,6 +110,7 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
       setCategoryDeleteError('')
       setCategoryEditError('')
       setTagCreateError('')
+      setTagDeleteErrors({})
       setTagEditErrors({})
     }
   }, [defaultBucketId, form, isOpen])
@@ -209,6 +213,38 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
     } catch (error) {
       const errorMessage = await getOperationErrorMessage(error, 'Could not save the tag.')
       setTagEditErrors((errors) => ({ ...errors, [tagId]: errorMessage }))
+    }
+  }
+
+  const handleDeleteTag = async (tagId: number, selectedTagIds: Array<string>) => {
+    const confirmed = window.confirm('Delete this tag? Todos using it will keep existing without this tag.')
+
+    if (!confirmed) {
+      return
+    }
+
+    setTagDeleteErrors((errors) => {
+      const { [tagId]: _removed, ...remainingErrors } = errors
+      return remainingErrors
+    })
+
+    try {
+      await deleteTagMutation.mutateAsync({
+        data: {
+          id: tagId,
+        },
+      })
+
+      const tagFormId = String(tagId)
+      form.setFieldValue(
+        'tagIds',
+        selectedTagIds.filter((selectedTagId) => selectedTagId !== tagFormId),
+      )
+      form.setFieldValue('tagEditColorKeys', removeRecordKey(form.state.values.tagEditColorKeys, tagFormId))
+      form.setFieldValue('tagEditNames', removeRecordKey(form.state.values.tagEditNames, tagFormId))
+    } catch (error) {
+      const errorMessage = await getOperationErrorMessage(error, 'Could not delete the tag.')
+      setTagDeleteErrors((errors) => ({ ...errors, [tagId]: errorMessage }))
     }
   }
 
@@ -640,6 +676,17 @@ export default function TodoDialog({ buckets, defaultBucketId, isOpen, setOpen }
                                   Save tag
                                 </Button>
                               </div>
+                              <Button
+                                type='button'
+                                variant='secondary'
+                                onClick={() => void handleDeleteTag(tag.id, field.state.value)}
+                                disabled={deleteTagMutation.isPending}
+                              >
+                                Delete tag
+                              </Button>
+                              {tagDeleteErrors[tag.id] && (
+                                <FieldError className='text-xs font-medium'>{tagDeleteErrors[tag.id]}</FieldError>
+                              )}
                               {tagEditErrors[tag.id] && (
                                 <FieldError className='text-xs font-medium'>{tagEditErrors[tag.id]}</FieldError>
                               )}
@@ -757,6 +804,11 @@ function getDefaultFormValues(defaultBucketId: number): TodoFormValues {
     tagIds: [],
     title: '',
   }
+}
+
+function removeRecordKey<T>(record: Record<string, T>, key: string) {
+  const { [key]: _removed, ...remaining } = record
+  return remaining
 }
 
 async function getOperationErrorMessage(error: unknown, fallbackMessage: string) {
