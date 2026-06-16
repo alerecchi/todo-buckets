@@ -131,7 +131,9 @@ export function SignUpForm() {
               onBlur: nameValidator,
               onSubmit: nameValidator,
             }}
-            children={(field) => <field.TextInput label='Name' placeholder='John Doe' type='text' icon={<User />} />}
+            children={(field) => (
+              <field.AuthTextInput label='Name' placeholder='John Doe' type='text' icon={<User />} />
+            )}
           />
           <form.AppField
             name='email'
@@ -140,7 +142,7 @@ export function SignUpForm() {
               onSubmit: emailValidator,
             }}
             children={(field) => (
-              <field.TextInput label='Email Address' placeholder='name@example.com' type='email' icon={<Mail />} />
+              <field.AuthTextInput label='Email Address' placeholder='name@example.com' type='email' icon={<Mail />} />
             )}
           />
           <form.AppField

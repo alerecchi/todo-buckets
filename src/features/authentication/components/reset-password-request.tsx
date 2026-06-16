@@ -63,7 +63,7 @@ export default function ResetPasswordRequest({
               onSubmit: emailValidator,
             }}
             children={(field) => (
-              <field.TextInput label='Email Address' placeholder='email@example.com' type='email' icon={<Mail />} />
+              <field.AuthTextInput label='Email Address' placeholder='email@example.com' type='email' icon={<Mail />} />
             )}
           />
           <form.AppForm>

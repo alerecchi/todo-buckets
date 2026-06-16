@@ -6,6 +6,7 @@
     "dev": "vite dev --port 3000",
     "build": "tsc --noEmit && vite build",
     "serve": "vite preview",
+    "seed": "tsx scripts/seed.ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",

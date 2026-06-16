@@ -58,8 +58,7 @@ When folders contain code that is exported for other modules/components an `inde
 
 ## Task Readiness For Code Changes
 
-- `pnpm run format` and `pnpm test` must pass before considering code changes completed.
-- `cr --agent` must be invoked and the comments addressed before considering code changes completed. If CodeRabbit is unavailable or unauthenticated, state that clearly in the final response.
+- `pnpm run build`, `pnpm run format` and `pnpm test` must pass before considering code changes completed.
 
 ## Agent skills
 

@@ -20,7 +20,7 @@ export function Board() {
     // TODO possibly "h-screen" and "container" on a higher level div
     <div className='container mx-auto flex h-screen flex-row gap-6'>
       {sortedBuckets.map((bucket: Bucket) => (
-        <BucketColumn key={bucket.id} bucket={bucket} />
+        <BucketColumn key={bucket.id} bucket={bucket} buckets={sortedBuckets} />
       ))}
     </div>
   )
