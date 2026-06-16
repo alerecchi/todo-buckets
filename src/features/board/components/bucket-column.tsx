@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { Inbox, ListTodo, LucideIcon, Map, Mountain, Signpost } from 'lucide-react'
+import { Inbox, ListTodo, Map, Mountain, Signpost } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 import AddTodoButton from '@/features/board/components/create-todo-button'
 import TodoCard from '@/features/board/components/todo-card'
@@ -12,9 +13,9 @@ interface BucketProps {
   bucket: Bucket
 }
 
-//TODO order for todos
+// TODO order for todos
 export function BucketColumn({ bucket }: BucketProps) {
-  const { data: todoList = []} = useSuspenseQuery(getTodosQueryOptions(bucket.id))
+  const { data: todoList = [] } = useSuspenseQuery(getTodosQueryOptions(bucket.id))
   const { icon: Icon, textColor, bgColor } = bucketStyles[bucket.type]
 
   return (
