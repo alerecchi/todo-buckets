@@ -15,7 +15,6 @@ Add edit-mode Todo deletion. A signed-in user can delete an existing Todo from t
 - [ ] Todo deletion is not exposed outside edit mode in this scope.
 - [ ] Server-function tests cover successful delete, nonexistent Todo behavior, and another user's Todo rejection.
 - [ ] Dialog/cache behavior tests cover confirmation, successful card removal, close-on-success, and failed-delete feedback.
-- [ ] `pnpm run format`, `pnpm test`, and `cr --agent` have been run; actionable CodeRabbit comments are addressed or unavailability is stated.
 
 ## Blocked by
 

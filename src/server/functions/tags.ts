@@ -7,9 +7,11 @@ import type { TagDbInsert } from '@/server/db/types'
 import type { TagRepository } from '@/server/functions/tags.core'
 import {
   CreateTagInput,
+  DeleteTagInput,
   TagNameConflictError,
   UpdateTagInput,
   createTagForUser,
+  deleteTagForUser,
   listTagsForUser,
   updateTagForUser,
 } from '@/server/functions/tags.core'
@@ -46,6 +48,17 @@ export const updateTag = createServerFn({ method: 'POST' })
     })
   })
 
+export const deleteTag = createServerFn({ method: 'POST' })
+  .middleware([authRequiredMiddleware])
+  .inputValidator(DeleteTagInput)
+  .handler(async ({ data, context }) => {
+    return deleteTagForUser({
+      data,
+      repository: tagRepository,
+      userId: context.session.user.id,
+    })
+  })
+
 const tagRepository: TagRepository = {
   async createTag(tagToAdd: TagDbInsert) {
     const insertedTags = await db
@@ -68,6 +81,17 @@ const tagRepository: TagRepository = {
     if (!tag) {
       throw new Error('Could not create or find Tag')
     }
+
+    return tag
+  },
+  async deleteTag(tagId, userId) {
+    const [tag] = await db
+      .delete(tags)
+      .where(and(eq(tags.id, tagId), eq(tags.userId, userId)))
+      .returning({
+        tagId: tags.id,
+        userId: tags.userId,
+      })
 
     return tag
   },

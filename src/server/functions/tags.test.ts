@@ -1,10 +1,15 @@
+import { getTableConfig } from 'drizzle-orm/pg-core'
 import { describe, expect, it, vi } from 'vitest'
+
+import { todoTags } from '@/server/db/schema/schema'
 
 import {
   CreateTagInput,
+  DeleteTagInput,
   TagNameConflictError,
   UpdateTagInput,
   createTagForUser,
+  deleteTagForUser,
   listTagsForUser,
   updateTagForUser,
 } from './tags.core'
@@ -19,6 +24,7 @@ const existingTag = {
 
 const createRepository = (overrides: Partial<TagRepository> = {}): TagRepository => ({
   createTag: vi.fn((tagToCreate) => Promise.resolve({ id: 8, ...tagToCreate })),
+  deleteTag: vi.fn((tagId, userId) => Promise.resolve({ tagId, userId })),
   findTagByName: vi.fn(() => Promise.resolve(undefined)),
   listTagsForUser: vi.fn(() => Promise.resolve([])),
   updateTag: vi.fn((tagId, userId, updates) =>
@@ -239,5 +245,49 @@ describe('tag server behavior', () => {
       name: 'urgent_now',
     })
     expect(tag.name).toBe('urgent_now')
+  })
+
+  it('deletes an owned Tag', async () => {
+    const repository = createRepository()
+
+    const deletedTag = await deleteTagForUser({
+      data: DeleteTagInput.parse({
+        id: existingTag.id,
+      }),
+      repository,
+      userId: existingTag.userId,
+    })
+
+    expect(repository.deleteTag).toHaveBeenCalledWith(existingTag.id, existingTag.userId)
+    expect(deletedTag).toEqual({
+      tagId: existingTag.id,
+      userId: existingTag.userId,
+    })
+  })
+
+  it("rejects deleting another user's Tag", async () => {
+    const repository = createRepository({
+      deleteTag: vi.fn(() => Promise.resolve(undefined)),
+    })
+
+    await expect(
+      deleteTagForUser({
+        data: {
+          id: existingTag.id,
+        },
+        repository,
+        userId: existingTag.userId,
+      }),
+    ).rejects.toHaveProperty('status', 404)
+
+    expect(repository.deleteTag).toHaveBeenCalledWith(existingTag.id, existingTag.userId)
+  })
+
+  it('removes Todo Tag associations when a Tag is deleted', () => {
+    const tagForeignKey = getTableConfig(todoTags).foreignKeys.find(
+      (foreignKey) => foreignKey.getName() === 'todo_tags_tag_id_tags_id_fk',
+    )
+
+    expect(tagForeignKey?.onDelete).toBe('cascade')
   })
 })

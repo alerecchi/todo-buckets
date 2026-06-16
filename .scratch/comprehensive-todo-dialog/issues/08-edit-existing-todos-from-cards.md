@@ -20,7 +20,6 @@ This slice should remove creation time from Todo update input, keep completed st
 - [ ] Successful non-Bucket edits replace the Todo in place in the current Bucket cache.
 - [ ] Server-function tests cover ownership rejection, another user's Category/Tag rejection, and update input validation.
 - [ ] Card/dialog behavior tests cover card click edit, checkbox isolation, initial values, cancel reset, successful save, and failed-save feedback.
-- [ ] `pnpm run format`, `pnpm test`, and `cr --agent` have been run; actionable CodeRabbit comments are addressed or unavailability is stated.
 
 ## Blocked by
 

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CreateTodoButton from '@/features/board/components/create-todo-button'
 import { CATEGORIES_QUERY_KEY, TAGS_QUERY_KEY, TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
 import { createCategory, deleteCategory, listCategories, updateCategory } from '@/server/functions/categories'
-import { createTag, listTags, updateTag } from '@/server/functions/tags'
+import { createTag, deleteTag, listTags, updateTag } from '@/server/functions/tags'
 import { createTodo } from '@/server/functions/todos'
 import { createTestQueryClient, render } from '@/test'
 
@@ -21,6 +21,7 @@ vi.mock('@/server/functions/todos', () => ({
 
 vi.mock('@/server/functions/tags', () => ({
   createTag: vi.fn(),
+  deleteTag: vi.fn(),
   listTags: vi.fn(() => Promise.resolve([])),
   updateTag: vi.fn(),
 }))
@@ -93,6 +94,7 @@ const mockedDeleteCategory = vi.mocked(deleteCategory)
 const mockedListCategories = vi.mocked(listCategories)
 const mockedUpdateCategory = vi.mocked(updateCategory)
 const mockedCreateTag = vi.mocked(createTag)
+const mockedDeleteTag = vi.mocked(deleteTag)
 const mockedListTags = vi.mocked(listTags)
 const mockedUpdateTag = vi.mocked(updateTag)
 
@@ -103,6 +105,7 @@ describe('CreateTodoButton', () => {
     mockedListCategories.mockReset()
     mockedListCategories.mockResolvedValue([])
     mockedCreateTag.mockReset()
+    mockedDeleteTag.mockReset()
     mockedListTags.mockReset()
     mockedListTags.mockResolvedValue([])
     mockedUpdateTag.mockReset()
@@ -386,6 +389,93 @@ describe('CreateTodoButton', () => {
     expect(await screen.findByText('Tag name already exists')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
     expect(mockedCreateTodo).not.toHaveBeenCalled()
+  })
+
+  it('deletes a selected Tag after confirmation and clears cached Todo card badges without submitting', async () => {
+    mockedListTags.mockResolvedValue([existingTag])
+    mockedDeleteTag.mockResolvedValue({
+      tagId: existingTag.id,
+      userId: 'user-1',
+    })
+    mockedCreateTodo.mockResolvedValue(createdTodo)
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TAGS_QUERY_KEY], [existingTag])
+    queryClient.setQueryData(
+      [TODOS_QUERY_KEY, 1],
+      [
+        {
+          ...existingTodo,
+          tags: [
+            {
+              colorKey: existingTag.colorKey,
+              id: existingTag.id,
+              name: existingTag.name,
+            },
+          ],
+        },
+      ],
+    )
+
+    render(<CreateTodoButton bucketId={1} buckets={buckets} />, { queryClient })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Plan review' } })
+    fireEvent.click(await screen.findByLabelText(existingTag.name))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete tag' }))
+
+    await waitFor(() => {
+      expect(mockedDeleteTag).toHaveBeenCalled()
+    })
+    expect(confirmSpy).toHaveBeenCalledWith('Delete this tag? Todos using it will keep existing without this tag.')
+    expect(mockedDeleteTag.mock.calls[0]?.[0]).toEqual({
+      data: {
+        id: existingTag.id,
+      },
+    })
+    expect(mockedCreateTodo).not.toHaveBeenCalled()
+    expect(queryClient.getQueryData([TAGS_QUERY_KEY])).toEqual([])
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, 1])).toEqual([
+      expect.objectContaining({
+        tags: [],
+      }),
+    ])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    await waitFor(() => {
+      expect(mockedCreateTodo).toHaveBeenCalled()
+    })
+    expect(mockedCreateTodo.mock.calls[0]?.[0]).toEqual({
+      data: {
+        bucketId: 1,
+        categoryId: null,
+        description: '',
+        tagIds: [],
+        title: 'Plan review',
+      },
+    })
+
+    confirmSpy.mockRestore()
+  })
+
+  it('keeps Tag delete errors local to the picker', async () => {
+    mockedListTags.mockResolvedValue([existingTag])
+    mockedDeleteTag.mockRejectedValue(new Error('Could not delete the tag.'))
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    render(<CreateTodoButton bucketId={1} buckets={buckets} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+    fireEvent.click(await screen.findByLabelText(existingTag.name))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete tag' }))
+
+    expect(await screen.findByText('Could not delete the tag.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
+    expect(screen.getByLabelText(existingTag.name)).toBeChecked()
+    expect(mockedCreateTodo).not.toHaveBeenCalled()
+
+    confirmSpy.mockRestore()
   })
 
   it('keeps the dialog open and shows feedback when Category creation fails', async () => {

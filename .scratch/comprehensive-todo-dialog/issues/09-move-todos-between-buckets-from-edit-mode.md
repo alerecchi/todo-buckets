@@ -14,7 +14,6 @@ Complete the edit-mode Bucket movement path. A signed-in user can change the sel
 - [ ] Failed Bucket moves keep the dialog open and show a main Todo operation error.
 - [ ] Server-function tests cover successful Bucket moves, archived target rejection, and another user's Bucket rejection.
 - [ ] Dialog/cache behavior tests cover Bucket move save, old-column removal, new-column add/replace, and failed-move feedback.
-- [ ] `pnpm run format`, `pnpm test`, and `cr --agent` have been run; actionable CodeRabbit comments are addressed or unavailability is stated.
 
 ## Blocked by
 
