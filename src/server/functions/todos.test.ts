@@ -444,11 +444,71 @@ describe('todo server behavior', () => {
     ])
   })
 
-  it('requires an active owned target bucket when moving todos', async () => {
+  it('moves a Todo to another active owned Bucket', async () => {
+    const repository = createRepository({
+      findOwnedActiveBucket: vi.fn((userId, bucketId) =>
+        Promise.resolve(
+          userId === activeBucket.userId && bucketId === otherActiveBucket.id ? otherActiveBucket : undefined,
+        ),
+      ),
+      findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(existingTodo)),
+      updateTodo: vi.fn((todoId, userId, updates) =>
+        Promise.resolve({
+          ...existingTodo,
+          ...updates,
+          id: todoId,
+          userId,
+        }),
+      ),
+    })
+
+    const updatedTodo = await updateTodoForUser({
+      data: {
+        bucketId: otherActiveBucket.id,
+        id: existingTodo.id,
+      },
+      repository,
+      userId: activeBucket.userId,
+    })
+
+    expect(repository.findOwnedActiveBucket).toHaveBeenCalledWith(activeBucket.userId, otherActiveBucket.id)
+    expect(repository.updateTodo).toHaveBeenCalledWith(existingTodo.id, activeBucket.userId, {
+      bucketId: otherActiveBucket.id,
+    })
+    expect(updatedTodo).toMatchObject({
+      bucketId: otherActiveBucket.id,
+      id: existingTodo.id,
+      tags: [],
+      title: existingTodo.title,
+    })
+  })
+
+  it('rejects moving a Todo to an archived Bucket', async () => {
     const repository = createRepository({
       findOwnedActiveBucket: vi.fn((userId, bucketId) =>
         Promise.resolve(userId === activeBucket.userId && bucketId === otherActiveBucket.id ? undefined : activeBucket),
       ),
+      findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(existingTodo)),
+    })
+
+    await expect(
+      updateTodoForUser({
+        data: {
+          bucketId: otherActiveBucket.id,
+          id: existingTodo.id,
+        },
+        repository,
+        userId: activeBucket.userId,
+      }),
+    ).rejects.toHaveProperty('status', 404)
+
+    expect(repository.findOwnedActiveBucket).toHaveBeenCalledWith(activeBucket.userId, otherActiveBucket.id)
+    expect(repository.updateTodo).not.toHaveBeenCalled()
+  })
+
+  it("rejects moving a Todo to another user's Bucket", async () => {
+    const repository = createRepository({
+      findOwnedActiveBucket: vi.fn(() => Promise.resolve(undefined)),
       findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(existingTodo)),
     })
 

@@ -1,11 +1,12 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { setupServer } from 'msw/node'
+import type { SetupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll } from 'vitest'
 
-export const server = setupServer()
+export let server: SetupServer
 
-beforeAll(() => {
+beforeAll(async () => {
+  server = await createServerWithoutNodeLocalStorageWarning()
   server.listen({
     onUnhandledRequest: 'error',
   })
@@ -19,3 +20,23 @@ afterEach(() => {
 afterAll(() => {
   server.close()
 })
+
+async function createServerWithoutNodeLocalStorageWarning() {
+  const localStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: undefined,
+  })
+
+  try {
+    const { setupServer } = await import('msw/node')
+    return setupServer()
+  } finally {
+    if (localStorageDescriptor) {
+      Object.defineProperty(globalThis, 'localStorage', localStorageDescriptor)
+    } else {
+      Reflect.deleteProperty(globalThis, 'localStorage')
+    }
+  }
+}

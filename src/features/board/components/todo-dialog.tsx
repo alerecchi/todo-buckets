@@ -99,6 +99,7 @@ export default function TodoDialog({ buckets, defaultBucketId, editingTodo, isOp
             await updateTodoMutation.mutateAsync({
               data: {
                 ...todoData,
+                bucketId: Number(value.bucketId),
                 id: editingTodo.id,
               },
               oldBucketId: editingTodo.bucketId,
@@ -324,8 +325,9 @@ export default function TodoDialog({ buckets, defaultBucketId, editingTodo, isOp
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className='sm:max-w-[425px]'>
+      <DialogContent className='max-h-[calc(100dvh-2rem)] overflow-hidden sm:max-w-[425px]'>
         <form
+          className='flex max-h-[calc(100dvh-5rem)] min-h-0 flex-col'
           id={formId}
           onSubmit={(e) => {
             e.preventDefault()
@@ -333,10 +335,10 @@ export default function TodoDialog({ buckets, defaultBucketId, editingTodo, isOp
             form.handleSubmit()
           }}
         >
-          <DialogHeader>
+          <DialogHeader className='shrink-0'>
             <DialogTitle>{isEditMode ? 'Edit Task' : 'Add New Task'}</DialogTitle>
           </DialogHeader>
-          <div className='my-4 grid gap-4'>
+          <div className='my-4 grid min-h-0 gap-4 overflow-y-auto pr-1'>
             <form.AppField
               name='title'
               validators={{
@@ -401,7 +403,6 @@ export default function TodoDialog({ buckets, defaultBucketId, editingTodo, isOp
                     onChange={(e) => {
                       field.handleChange(e.target.value)
                     }}
-                    disabled={isEditMode}
                     value={field.state.value}
                     className={cn(
                       'h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm',
@@ -793,7 +794,7 @@ export default function TodoDialog({ buckets, defaultBucketId, editingTodo, isOp
               <form.FormErrorAlert />
             </form.AppForm>
           </div>
-          <DialogFooter>
+          <DialogFooter className='shrink-0'>
             <Button type='button' variant='secondary' onClick={() => setOpen(false)}>
               Cancel
             </Button>
