@@ -61,27 +61,17 @@ export const deleteTag = createServerFn({ method: 'POST' })
 
 const tagRepository: TagRepository = {
   async createTag(tagToAdd: TagDbInsert) {
-    const insertedTags = await db
+    const [tag] = await db
       .insert(tags)
       .values(tagToAdd)
-      .onConflictDoNothing({
-        target: [tags.userId, tags.name],
-      })
       .returning()
-    const insertedTag = insertedTags.at(0)
+      .catch((error: unknown) => {
+        if (isTagNameUniqueViolation(error)) {
+          throw new TagNameConflictError()
+        }
 
-    if (insertedTag) {
-      return insertedTag
-    }
-
-    const tag = await db.query.tags.findFirst({
-      where: and(eq(tags.userId, tagToAdd.userId), eq(tags.name, tagToAdd.name)),
-    })
-
-    if (!tag) {
-      throw new Error('Could not create or find Tag')
-    }
-
+        throw error
+      })
     return tag
   },
   async deleteTag(tagId, userId) {

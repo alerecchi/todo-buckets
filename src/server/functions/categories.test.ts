@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { todos } from '@/server/db/schema/schema'
 
 import {
+  CategoryNameConflictError,
   CreateCategoryInput,
   DeleteCategoryInput,
   UpdateCategoryInput,
@@ -62,24 +63,46 @@ describe('category server behavior', () => {
     })
   })
 
-  it('returns an existing matching Category on duplicate create without recoloring it', async () => {
+  it('rejects duplicate Category creation without selecting the existing Category', async () => {
     const repository = createRepository({
-      createCategory: vi.fn(() => Promise.resolve(existingCategory)),
+      findCategoryByName: vi.fn(() => Promise.resolve(existingCategory)),
     })
 
-    const category = await createCategoryForUser({
-      data: CreateCategoryInput.parse({
-        colorKey: 'rose',
-        name: 'HOME ADMIN',
+    await expect(
+      createCategoryForUser({
+        data: CreateCategoryInput.parse({
+          colorKey: 'rose',
+          name: 'HOME ADMIN',
+        }),
+        repository,
+        userId: existingCategory.userId,
       }),
-      repository,
-      userId: existingCategory.userId,
+    ).rejects.toHaveProperty('status', 409)
+
+    expect(repository.findCategoryByName).toHaveBeenCalledWith(existingCategory.userId, existingCategory.name)
+    expect(repository.createCategory).not.toHaveBeenCalled()
+  })
+
+  it('rejects a raced Category create conflict that reaches the repository insert', async () => {
+    const repository = createRepository({
+      createCategory: vi.fn(() => Promise.reject(new CategoryNameConflictError())),
     })
 
-    expect(category).toBe(existingCategory)
+    await expect(
+      createCategoryForUser({
+        data: CreateCategoryInput.parse({
+          colorKey: 'rose',
+          name: 'HOME ADMIN',
+        }),
+        repository,
+        userId: existingCategory.userId,
+      }),
+    ).rejects.toHaveProperty('status', 409)
+
+    expect(repository.findCategoryByName).toHaveBeenCalledWith(existingCategory.userId, existingCategory.name)
     expect(repository.createCategory).toHaveBeenCalledWith({
       colorKey: 'rose',
-      name: 'home admin',
+      name: existingCategory.name,
       userId: existingCategory.userId,
     })
   })

@@ -1,11 +1,12 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 
 import { db } from '@/server/db/client'
 import { categories } from '@/server/db/schema/schema'
 import type { CategoryDbInsert } from '@/server/db/types'
 import type { CategoryRepository } from '@/server/functions/categories.core'
 import {
+  CategoryNameConflictError,
   CreateCategoryInput,
   DeleteCategoryInput,
   UpdateCategoryInput,
@@ -63,13 +64,14 @@ const categoryRepository: CategoryRepository = {
     const [category] = await db
       .insert(categories)
       .values(categoryToAdd)
-      .onConflictDoUpdate({
-        target: [categories.userId, categories.name],
-        set: {
-          colorKey: sql`${categories.colorKey}`,
-        },
-      })
       .returning()
+      .catch((error: unknown) => {
+        if (isCategoryNameUniqueViolation(error)) {
+          throw new CategoryNameConflictError()
+        }
+
+        throw error
+      })
 
     return category
   },
@@ -104,4 +106,26 @@ const categoryRepository: CategoryRepository = {
 
     return category
   },
+}
+
+function isCategoryNameUniqueViolation(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return false
+  }
+
+  const maybeDatabaseError = error as {
+    code?: unknown
+    constraint?: unknown
+    constraint_name?: unknown
+  }
+
+  if (maybeDatabaseError.code !== '23505') {
+    return false
+  }
+
+  return (
+    maybeDatabaseError.constraint === undefined ||
+    maybeDatabaseError.constraint === 'categories_user_id_name_unique' ||
+    maybeDatabaseError.constraint_name === 'categories_user_id_name_unique'
+  )
 }

@@ -81,11 +81,25 @@ type DeleteTagDependencies = {
 }
 
 export async function createTagForUser({ data, repository, userId }: CreateTagDependencies) {
-  const tag = await repository.createTag({
-    colorKey: data.colorKey,
-    name: data.name,
-    userId,
-  })
+  const tagWithName = await repository.findTagByName(userId, data.name)
+
+  if (tagWithName) {
+    throw errorResponse(409, 'Tag name already exists')
+  }
+
+  const tag = await repository
+    .createTag({
+      colorKey: data.colorKey,
+      name: data.name,
+      userId,
+    })
+    .catch((error: unknown) => {
+      if (error instanceof TagNameConflictError) {
+        throw errorResponse(409, error.message)
+      }
+
+      throw error
+    })
 
   return toTagDisplay(tag)
 }
