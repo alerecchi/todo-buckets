@@ -4,6 +4,12 @@ import { CategoryColorKeySchema } from '@/lib/types/Category'
 import type { CategoryDbInsert, CategoryDbSelect } from '@/server/db/types'
 import { errorResponse } from '@/server/utils'
 
+export class CategoryNameConflictError extends Error {
+  constructor() {
+    super('Category name already exists')
+  }
+}
+
 export const CreateCategoryInput = z
   .object({
     colorKey: CategoryColorKeySchema,
@@ -67,12 +73,25 @@ type DeleteCategoryDependencies = {
 
 export async function createCategoryForUser({ data, repository, userId }: CreateCategoryDependencies) {
   const name = normalizeCategoryName(data.name)
+  const categoryWithName = await repository.findCategoryByName(userId, name)
 
-  return repository.createCategory({
-    colorKey: data.colorKey,
-    name,
-    userId,
-  })
+  if (categoryWithName) {
+    throw errorResponse(409, 'Category name already exists')
+  }
+
+  return repository
+    .createCategory({
+      colorKey: data.colorKey,
+      name,
+      userId,
+    })
+    .catch((error: unknown) => {
+      if (error instanceof CategoryNameConflictError) {
+        throw errorResponse(409, error.message)
+      }
+
+      throw error
+    })
 }
 
 export function listCategoriesForUser({ repository, userId }: ListCategoriesDependencies) {

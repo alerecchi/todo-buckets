@@ -112,6 +112,21 @@ describe('Todo card edit dialog', () => {
     vi.spyOn(window, 'confirm').mockRestore()
   })
 
+  const openTagPicker = () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Manage tags' }))
+  }
+
+  const closeTopDialog = () => {
+    const closeButtons = screen.getAllByRole('button', { name: 'Close' })
+    const closeButton = closeButtons.at(-1)
+
+    if (!closeButton) {
+      throw new Error('Expected a close button')
+    }
+
+    fireEvent.click(closeButton)
+  }
+
   it('opens edit mode from a Todo card with the existing Todo values', async () => {
     mockedGetTodos.mockResolvedValue([existingTodo])
     mockedListCategories.mockResolvedValue([category])
@@ -128,9 +143,11 @@ describe('Todo card edit dialog', () => {
     expect(screen.getByLabelText('Title')).toHaveValue(existingTodo.title)
     expect(screen.getByLabelText('Description')).toHaveValue(existingTodo.description)
     expect(screen.getByLabelText('Bucket')).toHaveValue(String(existingTodo.bucketId))
-    expect(await screen.findByRole('option', { name: category.name })).toBeInTheDocument()
-    expect(screen.getByLabelText('Category')).toHaveValue(String(category.id))
+    expect(await screen.findByRole('button', { name: category.name })).toBeInTheDocument()
+    expect(screen.getAllByText(tag.name).length).toBeGreaterThan(0)
+    openTagPicker()
     expect(await screen.findByLabelText(tag.name)).toBeChecked()
+    closeTopDialog()
     expect(mockedUpdateTodo).not.toHaveBeenCalled()
   })
 
@@ -182,12 +199,17 @@ describe('Todo card edit dialog', () => {
 
     fireEvent.click(screen.getByText(existingTodo.title))
     expect(await screen.findByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
+    openTagPicker()
     await screen.findByLabelText(focusTag.name)
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: '  Plan async review  ' } })
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Bring slides' } })
-    fireEvent.change(screen.getByLabelText('Category'), { target: { value: '' } })
+    closeTopDialog()
+    fireEvent.click(screen.getByRole('button', { name: category.name }))
+    fireEvent.click(await screen.findByRole('button', { name: 'No category' }))
+    openTagPicker()
     fireEvent.click(screen.getByLabelText(tag.name))
     fireEvent.click(screen.getByLabelText(focusTag.name))
+    closeTopDialog()
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
 
     await waitFor(() => {
@@ -295,7 +317,7 @@ describe('Todo card edit dialog', () => {
     expect(await screen.findByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Unsaved title' } })
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Unsaved description' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    closeTopDialog()
 
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: 'Edit Task' })).not.toBeInTheDocument()
@@ -315,7 +337,6 @@ describe('Todo card edit dialog', () => {
       bucketId: existingTodo.bucketId,
       todoId: existingTodo.id,
     })
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([TODOS_QUERY_KEY, existingTodo.bucketId], [existingTodo])
 
@@ -324,11 +345,12 @@ describe('Todo card edit dialog', () => {
     fireEvent.click(screen.getByText(existingTodo.title))
     expect(await screen.findByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Delete todo' }))
+    expect(screen.getByText('Click Delete todo again to permanently delete it.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete todo' }))
 
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: 'Edit Task' })).not.toBeInTheDocument()
     })
-    expect(window.confirm).toHaveBeenCalledWith('Delete this todo? This cannot be undone.')
     expect(mockedDeleteTodo.mock.calls[0]?.[0]).toEqual({
       data: {
         id: existingTodo.id,
@@ -338,9 +360,8 @@ describe('Todo card edit dialog', () => {
     expect(screen.queryByText(existingTodo.title)).not.toBeInTheDocument()
   })
 
-  it('keeps edit mode open and leaves the Todo cached when delete confirmation is cancelled', async () => {
+  it('keeps edit mode open and leaves the Todo cached while awaiting delete confirmation', async () => {
     mockedGetTodos.mockResolvedValue([existingTodo])
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([TODOS_QUERY_KEY, existingTodo.bucketId], [existingTodo])
 
@@ -350,7 +371,7 @@ describe('Todo card edit dialog', () => {
     expect(await screen.findByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Delete todo' }))
 
-    expect(window.confirm).toHaveBeenCalledWith('Delete this todo? This cannot be undone.')
+    expect(screen.getByText('Click Delete todo again to permanently delete it.')).toBeInTheDocument()
     expect(mockedDeleteTodo).not.toHaveBeenCalled()
     expect(screen.getByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
     expect(queryClient.getQueryData([TODOS_QUERY_KEY, existingTodo.bucketId])).toEqual([existingTodo])
@@ -359,7 +380,6 @@ describe('Todo card edit dialog', () => {
   it('keeps edit mode open and shows feedback when deleting a Todo fails', async () => {
     mockedGetTodos.mockResolvedValue([existingTodo])
     mockedDeleteTodo.mockRejectedValue(new Error('Todo not found or unauthorized'))
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([TODOS_QUERY_KEY, existingTodo.bucketId], [existingTodo])
 
@@ -367,6 +387,8 @@ describe('Todo card edit dialog', () => {
 
     fireEvent.click(screen.getByText(existingTodo.title))
     expect(await screen.findByRole('heading', { name: 'Edit Task' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete todo' }))
+    expect(screen.getByText('Click Delete todo again to permanently delete it.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Delete todo' }))
 
     expect(await screen.findByText('Todo not found or unauthorized')).toBeInTheDocument()

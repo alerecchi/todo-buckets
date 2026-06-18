@@ -62,28 +62,46 @@ describe('tag server behavior', () => {
     })
   })
 
-  it('returns an existing matching Tag on duplicate create without recoloring it', async () => {
+  it('rejects duplicate Tag creation without selecting the existing Tag', async () => {
     const repository = createRepository({
-      createTag: vi.fn(() => Promise.resolve(existingTag)),
+      findTagByName: vi.fn(() => Promise.resolve(existingTag)),
     })
 
-    const tag = await createTagForUser({
-      data: CreateTagInput.parse({
-        colorKey: 'rose',
-        name: 'URGENT_NOW',
+    await expect(
+      createTagForUser({
+        data: CreateTagInput.parse({
+          colorKey: 'rose',
+          name: 'URGENT_NOW',
+        }),
+        repository,
+        userId: existingTag.userId,
       }),
-      repository,
-      userId: existingTag.userId,
+    ).rejects.toHaveProperty('status', 409)
+
+    expect(repository.findTagByName).toHaveBeenCalledWith(existingTag.userId, existingTag.name)
+    expect(repository.createTag).not.toHaveBeenCalled()
+  })
+
+  it('rejects a raced Tag create conflict that reaches the repository insert', async () => {
+    const repository = createRepository({
+      createTag: vi.fn(() => Promise.reject(new TagNameConflictError())),
     })
 
-    expect(tag).toEqual({
-      colorKey: existingTag.colorKey,
-      id: existingTag.id,
-      name: existingTag.name,
-    })
+    await expect(
+      createTagForUser({
+        data: CreateTagInput.parse({
+          colorKey: 'rose',
+          name: 'URGENT_NOW',
+        }),
+        repository,
+        userId: existingTag.userId,
+      }),
+    ).rejects.toHaveProperty('status', 409)
+
+    expect(repository.findTagByName).toHaveBeenCalledWith(existingTag.userId, existingTag.name)
     expect(repository.createTag).toHaveBeenCalledWith({
       colorKey: 'rose',
-      name: 'urgent_now',
+      name: existingTag.name,
       userId: existingTag.userId,
     })
   })

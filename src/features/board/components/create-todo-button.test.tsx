@@ -117,6 +117,25 @@ describe('CreateTodoButton', () => {
     mockedUpdateTodo.mockReset()
   })
 
+  const openCategoryPicker = (name = 'No Category') => {
+    fireEvent.click(screen.getByRole('button', { name }))
+  }
+
+  const openTagPicker = () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Manage tags' }))
+  }
+
+  const closeTopDialog = () => {
+    const closeButtons = screen.getAllByRole('button', { name: 'Close' })
+    const closeButton = closeButtons.at(-1)
+
+    if (!closeButton) {
+      throw new Error('Expected a close button')
+    }
+
+    fireEvent.click(closeButton)
+  }
+
   it('opens TodoDialog create mode with the current bucket selected', () => {
     render(<CreateTodoButton bucketId={1} buckets={buckets} />)
 
@@ -173,14 +192,16 @@ describe('CreateTodoButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Organize cabinet' } })
-    fireEvent.change(screen.getByLabelText('New category'), { target: { value: '  Home   Admin  ' } })
+    openCategoryPicker()
     fireEvent.click(screen.getByRole('button', { name: 'Create category' }))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: '  Home   Admin  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Category')).toHaveValue(String(createdCategory.id))
+      expect(mockedCreateCategory).toHaveBeenCalled()
     })
-    expect(screen.getByLabelText('Edit category name')).toHaveValue(createdCategory.name)
-    expect(screen.getByLabelText('Edit category color')).toHaveValue(createdCategory.colorKey)
+    closeTopDialog()
+    expect(screen.getByRole('button', { name: createdCategory.name })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
@@ -226,8 +247,10 @@ describe('CreateTodoButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Plan review' } })
+    openTagPicker()
     fireEvent.click(await screen.findByLabelText(existingTag.name))
     fireEvent.click(screen.getByLabelText(createdTag.name))
+    closeTopDialog()
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
     await waitFor(() => {
@@ -263,13 +286,16 @@ describe('CreateTodoButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Plan review' } })
-    fireEvent.change(screen.getByLabelText('New tag'), { target: { value: '  Focus  ' } })
+    openTagPicker()
     fireEvent.click(screen.getByRole('button', { name: 'Create tag' }))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: '  Focus  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
       expect(screen.getByLabelText(createdTag.name)).toBeChecked()
     })
 
+    closeTopDialog()
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
     await waitFor(() => {
@@ -337,10 +363,12 @@ describe('CreateTodoButton', () => {
     render(<CreateTodoButton bucketId={1} buckets={buckets} />, { queryClient })
 
     fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+    openTagPicker()
     expect(await screen.findByLabelText(existingTag.name)).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Edit tag name'), { target: { value: '  Next_Up  ' } })
-    fireEvent.change(screen.getByLabelText('Edit tag color'), { target: { value: 'green' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save tag' }))
+    fireEvent.click(screen.getByRole('button', { name: `Edit ${existingTag.name}` }))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: '  Next_Up  ' } })
+    fireEvent.click(screen.getByLabelText('green'))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
       expect(mockedUpdateTag).toHaveBeenCalled()
@@ -353,6 +381,7 @@ describe('CreateTodoButton', () => {
       },
     })
     expect(mockedCreateTodo).not.toHaveBeenCalled()
+    closeTopDialog()
     expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
     expect(queryClient.getQueryData([TAGS_QUERY_KEY])).toEqual([updatedTag])
     expect(queryClient.getQueryData([TODOS_QUERY_KEY, 1])).toEqual([
@@ -386,11 +415,15 @@ describe('CreateTodoButton', () => {
     render(<CreateTodoButton bucketId={1} buckets={buckets} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+    openTagPicker()
     expect(await screen.findByLabelText(existingTag.name)).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Edit tag name'), { target: { value: 'focus' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save tag' }))
+    fireEvent.click(screen.getByRole('button', { name: `Edit ${existingTag.name}` }))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'focus' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByText('Tag name already exists')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    closeTopDialog()
     expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
     expect(mockedCreateTodo).not.toHaveBeenCalled()
   })
@@ -402,7 +435,6 @@ describe('CreateTodoButton', () => {
       userId: 'user-1',
     })
     mockedCreateTodo.mockResolvedValue(createdTodo)
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([TAGS_QUERY_KEY], [existingTag])
     queryClient.setQueryData(
@@ -425,13 +457,16 @@ describe('CreateTodoButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Plan review' } })
+    openTagPicker()
     fireEvent.click(await screen.findByLabelText(existingTag.name))
-    fireEvent.click(screen.getByRole('button', { name: 'Delete tag' }))
+    fireEvent.click(screen.getByRole('button', { name: `Edit ${existingTag.name}` }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.getByText('Click Delete again to permanently delete this tag.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
 
     await waitFor(() => {
       expect(mockedDeleteTag).toHaveBeenCalled()
     })
-    expect(confirmSpy).toHaveBeenCalledWith('Delete this tag? Todos using it will keep existing without this tag.')
     expect(mockedDeleteTag.mock.calls[0]?.[0]).toEqual({
       data: {
         id: existingTag.id,
@@ -445,6 +480,7 @@ describe('CreateTodoButton', () => {
       }),
     ])
 
+    closeTopDialog()
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
     await waitFor(() => {
@@ -459,27 +495,27 @@ describe('CreateTodoButton', () => {
         title: 'Plan review',
       },
     })
-
-    confirmSpy.mockRestore()
   })
 
   it('keeps Tag delete errors local to the picker', async () => {
     mockedListTags.mockResolvedValue([existingTag])
     mockedDeleteTag.mockRejectedValue(new Error('Could not delete the tag.'))
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
 
     render(<CreateTodoButton bucketId={1} buckets={buckets} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+    openTagPicker()
     fireEvent.click(await screen.findByLabelText(existingTag.name))
-    fireEvent.click(screen.getByRole('button', { name: 'Delete tag' }))
+    fireEvent.click(screen.getByRole('button', { name: `Edit ${existingTag.name}` }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(screen.getByText('Click Delete again to permanently delete this tag.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
 
     expect(await screen.findByText('Could not delete the tag.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    closeTopDialog()
     expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
-    expect(screen.getByLabelText(existingTag.name)).toBeChecked()
     expect(mockedCreateTodo).not.toHaveBeenCalled()
-
-    confirmSpy.mockRestore()
   })
 
   it('keeps the dialog open and shows feedback when Category creation fails', async () => {
@@ -488,12 +524,16 @@ describe('CreateTodoButton', () => {
     render(<CreateTodoButton bucketId={1} buckets={buckets} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
-    fireEvent.change(screen.getByLabelText('New category'), { target: { value: 'Home admin' } })
+    openCategoryPicker()
     fireEvent.click(screen.getByRole('button', { name: 'Create category' }))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Home admin' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByText('Could not create the category.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    closeTopDialog()
     expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Category')).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'No Category' })).toBeInTheDocument()
   })
 
   it('renames and recolors a Category immediately and patches cached Todo cards without submitting the Todo', async () => {
@@ -539,11 +579,12 @@ describe('CreateTodoButton', () => {
     render(<CreateTodoButton bucketId={1} buckets={buckets} />, { queryClient })
 
     fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
-    expect(await screen.findByRole('option', { name: createdCategory.name })).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Category'), { target: { value: String(createdCategory.id) } })
-    fireEvent.change(await screen.findByLabelText('Edit category name'), { target: { value: '  Life   Admin  ' } })
-    fireEvent.change(screen.getByLabelText('Edit category color'), { target: { value: 'green' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save category' }))
+    openCategoryPicker()
+    expect(await screen.findByRole('button', { name: createdCategory.name })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: `Edit ${createdCategory.name}` }))
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: '  Life   Admin  ' } })
+    fireEvent.click(screen.getByLabelText('green'))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
       expect(mockedUpdateCategory).toHaveBeenCalled()
@@ -556,6 +597,7 @@ describe('CreateTodoButton', () => {
       },
     })
     expect(mockedCreateTodo).not.toHaveBeenCalled()
+    closeTopDialog()
     expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
     expect(queryClient.getQueryData([CATEGORIES_QUERY_KEY])).toEqual([updatedCategory])
     expect(queryClient.getQueryData([TODOS_QUERY_KEY, 1])).toEqual([
@@ -585,12 +627,15 @@ describe('CreateTodoButton', () => {
     render(<CreateTodoButton bucketId={1} buckets={buckets} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
-    expect(await screen.findByRole('option', { name: createdCategory.name })).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Category'), { target: { value: String(createdCategory.id) } })
-    fireEvent.change(await screen.findByLabelText('Edit category name'), { target: { value: 'life admin' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save category' }))
+    openCategoryPicker()
+    expect(await screen.findByRole('button', { name: createdCategory.name })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: `Edit ${createdCategory.name}` }))
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'life admin' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByText('Category name already exists')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    closeTopDialog()
     expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
     expect(mockedCreateTodo).not.toHaveBeenCalled()
   })
@@ -601,7 +646,6 @@ describe('CreateTodoButton', () => {
       categoryId: createdCategory.id,
       userId: 'user-1',
     })
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([CATEGORIES_QUERY_KEY], [createdCategory])
     queryClient.setQueryData(
@@ -622,23 +666,25 @@ describe('CreateTodoButton', () => {
     render(<CreateTodoButton bucketId={1} buckets={buckets} />, { queryClient })
 
     fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
-    expect(await screen.findByRole('option', { name: createdCategory.name })).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Category'), { target: { value: String(createdCategory.id) } })
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete category' }))
+    openCategoryPicker()
+    fireEvent.click(await screen.findByRole('button', { name: createdCategory.name }))
+    openCategoryPicker(createdCategory.name)
+    fireEvent.click(screen.getByRole('button', { name: `Edit ${createdCategory.name}` }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    expect(screen.getByText('Click Delete again to permanently delete this category.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
 
     await waitFor(() => {
       expect(mockedDeleteCategory).toHaveBeenCalled()
     })
-    expect(confirmSpy).toHaveBeenCalledWith(
-      'Delete this category? Todos using it will keep existing without a category.',
-    )
     expect(mockedDeleteCategory.mock.calls[0]?.[0]).toEqual({
       data: {
         id: createdCategory.id,
       },
     })
     expect(mockedCreateTodo).not.toHaveBeenCalled()
-    expect(screen.getByLabelText('Category')).toHaveValue('')
+    closeTopDialog()
+    expect(screen.getByRole('button', { name: 'No Category' })).toBeInTheDocument()
     expect(queryClient.getQueryData([CATEGORIES_QUERY_KEY])).toEqual([])
     expect(queryClient.getQueryData([TODOS_QUERY_KEY, 1])).toEqual([
       expect.objectContaining({
@@ -646,28 +692,29 @@ describe('CreateTodoButton', () => {
         categoryId: null,
       }),
     ])
-
-    confirmSpy.mockRestore()
   })
 
   it('keeps Category delete errors local to the picker', async () => {
     mockedListCategories.mockResolvedValue([createdCategory])
     mockedDeleteCategory.mockRejectedValue(new Error('Could not delete the category.'))
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
 
     render(<CreateTodoButton bucketId={1} buckets={buckets} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
-    expect(await screen.findByRole('option', { name: createdCategory.name })).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Category'), { target: { value: String(createdCategory.id) } })
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete category' }))
+    openCategoryPicker()
+    fireEvent.click(await screen.findByRole('button', { name: createdCategory.name }))
+    openCategoryPicker(createdCategory.name)
+    fireEvent.click(screen.getByRole('button', { name: `Edit ${createdCategory.name}` }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    expect(screen.getByText('Click Delete again to permanently delete this category.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
 
     expect(await screen.findByText('Could not delete the category.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    closeTopDialog()
     expect(screen.getByRole('heading', { name: 'Add New Task' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Category')).toHaveValue(String(createdCategory.id))
+    expect(screen.getByRole('button', { name: createdCategory.name })).toBeInTheDocument()
     expect(mockedCreateTodo).not.toHaveBeenCalled()
-
-    confirmSpy.mockRestore()
   })
 
   it('rejects missing title and missing bucket before saving', async () => {
