@@ -22,7 +22,7 @@ The current stack is:
 - Better Auth for authentication;
 - Zod for validation;
 - Drizzle as a DB ORM (using a Neon backend)
-- Tailwind v4 and shadcn/ui for CSS and UI components (prefer a shadcn/ui component, if available, over creating your own)
+- Tailwind v4 and shadcn/ui for CSS and UI components. Prefer using shadcn's components when available over creating your own. Never use BaseUI components directly, better propose to install the shadcn component.
 
 For the TanStack libraries, you have access to the TanStack CLI and you can query docs using that:
 `tanstack search-docs <query> [options]`
@@ -54,7 +54,7 @@ The project has an opinionated structure that is feature-based but does not colo
 - `server/middleware`;
 
 As this is a WIP project this project structure is subject to changes.
-When folders contain code that is exported for other modules/components an `index.ts` file should be added to improve dev experience.
+When folders contain many elements that are exported for other modules/components an `index.ts` file should be added to improve dev experience.
 
 ## Agent skills
 

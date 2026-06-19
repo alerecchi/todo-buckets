@@ -1,8 +1,8 @@
-import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
 import { Button } from '@shared/components/ui/button'
 import { Checkbox } from '@shared/components/ui/checkbox'
 import { FieldError } from '@shared/components/ui/field'
 import { Input } from '@shared/components/ui/input'
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@shared/components/ui/popover'
 import { Check, ChevronLeft, Search, Trash2, X } from 'lucide-react'
 import type { ReactElement, ReactNode } from 'react'
 
@@ -26,26 +26,18 @@ export function ResourcePopover({
   trigger: ReactElement
 }) {
   return (
-    <PopoverPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      <PopoverPrimitive.Trigger render={trigger} />
-      <PopoverPrimitive.Portal>
-        <PopoverPrimitive.Positioner
-          side='bottom'
-          align='start'
-          sideOffset={6}
-          collisionPadding={12}
-          collisionAvoidance={{ side: 'flip', align: 'shift' }}
-          className='z-[60]'
-        >
-          <PopoverPrimitive.Popup
-            initialFocus={false}
-            className='grid w-[min(300px,calc(100vw-2rem))] gap-3 rounded-xl bg-background p-4 text-sm shadow-lg ring-1 ring-foreground/10 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95'
-          >
-            {children}
-          </PopoverPrimitive.Popup>
-        </PopoverPrimitive.Positioner>
-      </PopoverPrimitive.Portal>
-    </PopoverPrimitive.Root>
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger render={trigger} />
+      <PopoverContent
+        initialFocus={false}
+        side='bottom'
+        align='start'
+        sideOffset={6}
+        className='grid w-[min(300px,calc(100vw-2rem))] gap-3 rounded-xl'
+      >
+        {children}
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -65,7 +57,7 @@ export function ResourceListPanel({
   return (
     <>
       <div className='flex items-center justify-between gap-2'>
-        <PopoverPrimitive.Title className='text-sm font-semibold'>{title}</PopoverPrimitive.Title>
+        <PopoverTitle className='text-sm font-semibold'>{title}</PopoverTitle>
         <Button type='button' variant='ghost' size='icon-sm' className='cursor-pointer' onClick={onClose}>
           <X />
           <span className='sr-only'>Close</span>
@@ -240,7 +232,7 @@ function ResourceEditPanel<TColorKey extends string>({
           <ChevronLeft />
           <span className='sr-only'>Back</span>
         </Button>
-        <PopoverPrimitive.Title className='text-sm font-semibold'>{title}</PopoverPrimitive.Title>
+        <PopoverTitle className='text-sm font-semibold'>{title}</PopoverTitle>
       </div>
       {preview && <div className='rounded-md border p-3'>{preview}</div>}
       <label className='grid gap-2'>

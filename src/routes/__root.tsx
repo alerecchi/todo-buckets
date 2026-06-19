@@ -5,6 +5,7 @@ import { HeadContent, Scripts, createRootRouteWithContext } from '@tanstack/reac
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 
 import { userSessionQuery } from '@/features/authentication/queries/user-session'
+import { AppNavigation } from '@/features/shared/components/app-navigation'
 
 import appCss from '../styles/app.css?url'
 
@@ -44,7 +45,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {/* TODO: body fullscreen vertically even with small content? or should it be in components / Layout component? */}
-        {/* <Header /> */}
+        <AppNavigation />
         {children}
         <TanStackDevtools
           config={{
