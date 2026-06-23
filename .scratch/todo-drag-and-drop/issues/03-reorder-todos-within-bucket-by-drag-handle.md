@@ -19,7 +19,6 @@ Enable signed-in users to reorder Todos within a Bucket directly on the board by
 - [ ] Keyboard drag support is wired through the DnD library's handle behavior where reasonably available.
 - [ ] No separate move-up or move-down buttons are added.
 - [ ] Component tests cover drag handle presence, same-Bucket insertion-line placement, same-Bucket drop destination, card click edit preservation, and checkbox behavior preservation.
-- [ ] `pnpm run format`, `pnpm test`, and `cr --agent` have been run; actionable CodeRabbit comments are addressed or unavailability is stated.
 
 ## Blocked by
 

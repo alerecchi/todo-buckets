@@ -23,6 +23,7 @@ const todoWithCategory = {
   createdAt: new Date('2026-06-11T10:00:00.000Z'),
   description: '',
   id: 10,
+  position: 1024,
   tags: [],
   title: 'Pay rent',
 } satisfies Todo

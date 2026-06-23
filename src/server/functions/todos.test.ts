@@ -55,6 +55,7 @@ const existingTodo = {
   createdAt: new Date('2026-06-10T08:00:00.000Z'),
   description: '',
   id: 10,
+  position: 1024,
   tags: [],
   title: 'Pay rent',
   userId: activeBucket.userId,
@@ -69,6 +70,7 @@ const createRepository = (overrides: Partial<TodoRepository> = {}): TodoReposito
     Promise.resolve([urgentTag, focusTag].filter((tag) => tag.userId === userId && tagIds.includes(tag.id))),
   ),
   findOwnedTodoWithBucket: vi.fn(),
+  getMaxTodoPosition: vi.fn(() => Promise.resolve(null)),
   getTodosByBucketForUser: vi.fn(() => Promise.resolve([])),
   replaceTodoTags: vi.fn(() => Promise.resolve()),
   updateTodo: vi.fn(),
@@ -98,6 +100,7 @@ describe('todo server behavior', () => {
       completed: false,
       createdAt,
       description: 'Details to remember',
+      position: 1024,
       title: 'Pay rent',
       userId: activeBucket.userId,
     })
@@ -125,6 +128,24 @@ describe('todo server behavior', () => {
     })
 
     expect(repository.createTodo).toHaveBeenCalledWith(expect.objectContaining({ description: '' }))
+  })
+
+  it('creates new todos after the current bottom position in the selected Bucket', async () => {
+    const repository = createRepository({
+      getMaxTodoPosition: vi.fn(() => Promise.resolve(2048)),
+    })
+
+    await createTodoForUser({
+      data: CreateTodoInput.parse({
+        bucketId: activeBucket.id,
+        title: 'Pay rent',
+      }),
+      repository,
+      userId: activeBucket.userId,
+    })
+
+    expect(repository.getMaxTodoPosition).toHaveBeenCalledWith(activeBucket.userId, activeBucket.id)
+    expect(repository.createTodo).toHaveBeenCalledWith(expect.objectContaining({ position: 3072 }))
   })
 
   it('creates todos with an owned Category selected', async () => {
@@ -331,6 +352,32 @@ describe('todo server behavior', () => {
     expect(todos).toEqual([existingTodo])
   })
 
+  it('returns todos in the persisted Todo Position order provided by the repository', async () => {
+    const lowerTodo = {
+      ...existingTodo,
+      id: 11,
+      position: 1024,
+      title: 'First',
+    }
+    const higherTodo = {
+      ...existingTodo,
+      id: 12,
+      position: 2048,
+      title: 'Second',
+    }
+    const repository = createRepository({
+      getTodosByBucketForUser: vi.fn(() => Promise.resolve([lowerTodo, higherTodo])),
+    })
+
+    const todos = await getTodosForUser({
+      data: { bucketId: activeBucket.id },
+      repository,
+      userId: activeBucket.userId,
+    })
+
+    expect(todos).toEqual([lowerTodo, higherTodo])
+  })
+
   it('does not expose creation time as editable update input', () => {
     expect(
       UpdateTodoInput.safeParse({
@@ -452,6 +499,7 @@ describe('todo server behavior', () => {
         ),
       ),
       findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(existingTodo)),
+      getMaxTodoPosition: vi.fn(() => Promise.resolve(4096)),
       updateTodo: vi.fn((todoId, userId, updates) =>
         Promise.resolve({
           ...existingTodo,
@@ -472,8 +520,10 @@ describe('todo server behavior', () => {
     })
 
     expect(repository.findOwnedActiveBucket).toHaveBeenCalledWith(activeBucket.userId, otherActiveBucket.id)
+    expect(repository.getMaxTodoPosition).toHaveBeenCalledWith(activeBucket.userId, otherActiveBucket.id)
     expect(repository.updateTodo).toHaveBeenCalledWith(existingTodo.id, activeBucket.userId, {
       bucketId: otherActiveBucket.id,
+      position: 5120,
     })
     expect(updatedTodo).toMatchObject({
       bucketId: otherActiveBucket.id,

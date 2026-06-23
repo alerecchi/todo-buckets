@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray, max } from 'drizzle-orm'
 
 import { db } from '@/server/db/client'
 import { buckets, categories, tags, todoTags, todos } from '@/server/db/schema/schema'
@@ -104,8 +104,17 @@ const todoRepository: TodoRepository = {
 
     return todo ? withTags(todo) : undefined
   },
+  async getMaxTodoPosition(userId: string, bucketId: number) {
+    const [row] = await db
+      .select({ position: max(todos.position) })
+      .from(todos)
+      .where(and(eq(todos.userId, userId), eq(todos.bucketId, bucketId)))
+
+    return row.position ?? null
+  },
   async getTodosByBucketForUser(userId: string, bucketId: number) {
     const bucketTodos = await db.query.todos.findMany({
+      orderBy: [asc(todos.position), asc(todos.id)],
       where: and(eq(todos.bucketId, bucketId), eq(todos.userId, userId)),
       with: {
         category: {

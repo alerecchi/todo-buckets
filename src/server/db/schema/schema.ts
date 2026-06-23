@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm'
-import { boolean, integer, pgEnum, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { boolean, index, integer, pgEnum, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 import { CATEGORY_COLOR_KEYS } from '../../../lib/types/Category'
 import { TAG_COLOR_KEYS } from '../../../lib/types/Tag'
@@ -33,20 +33,25 @@ export const categories = pgTable(
   (table) => [uniqueIndex('categories_user_id_name_unique').on(table.userId, table.name)],
 )
 
-export const todos = pgTable('todos', {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  title: text().notNull(),
-  description: text().notNull(),
-  completed: boolean().notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
-  bucketId: integer('bucket_id')
-    .references(() => buckets.id, { onDelete: 'cascade' })
-    .notNull(),
-  categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
-  userId: text('user_id')
-    .references(() => users.id, { onDelete: 'cascade' })
-    .notNull(),
-})
+export const todos = pgTable(
+  'todos',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    title: text().notNull(),
+    description: text().notNull(),
+    completed: boolean().notNull(),
+    position: integer().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    bucketId: integer('bucket_id')
+      .references(() => buckets.id, { onDelete: 'cascade' })
+      .notNull(),
+    categoryId: integer('category_id').references(() => categories.id, { onDelete: 'set null' }),
+    userId: text('user_id')
+      .references(() => users.id, { onDelete: 'cascade' })
+      .notNull(),
+  },
+  (table) => [index('todos_user_id_bucket_id_position_idx').on(table.userId, table.bucketId, table.position)],
+)
 
 export const tags = pgTable(
   'tags',

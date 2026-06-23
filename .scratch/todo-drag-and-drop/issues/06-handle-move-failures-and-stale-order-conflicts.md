@@ -17,7 +17,6 @@ Harden Todo move mutations so optimistic drag-and-drop never leaves the board in
 - [ ] Conflict handling distinguishes stale ordering from generic mutation failure.
 - [ ] Cache behavior tests cover optimistic movement, successful cache patching, rollback on failure, affected-Bucket refresh or invalidation, and toast triggering.
 - [ ] Manual verification notes cover at least one failed or conflicted move.
-- [ ] `pnpm run format`, `pnpm test`, and `cr --agent` have been run; actionable CodeRabbit comments are addressed or unavailability is stated.
 
 ## Blocked by
 

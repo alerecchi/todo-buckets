@@ -10,6 +10,7 @@ export const TodoSchema = z.object({
   category: CategoryDisplaySchema.nullable(),
   categoryId: z.int().nullable(),
   completed: z.boolean(),
+  position: z.int(),
   createdAt: z.date(),
   bucketId: z.int(),
   tags: z.array(TagDisplaySchema),

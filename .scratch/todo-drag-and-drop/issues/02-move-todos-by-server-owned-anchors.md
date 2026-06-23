@@ -18,7 +18,6 @@ Add a dedicated move operation for changing a Todo's Bucket and Todo Position fr
 - [ ] The server rebalances positions within the same correctness boundary when neighboring anchors leave no usable integer gap.
 - [ ] The operation returns enough Todo and Bucket information for affected client caches to be patched on success.
 - [ ] Server behavior tests cover same-Bucket moves, cross-Bucket moves, sparse position calculation between valid neighboring anchors, no-gap rebalancing, stale-anchor conflicts, archived Bucket rejection, and cross-user ownership rejection.
-- [ ] `pnpm run format`, `pnpm test`, and `cr --agent` have been run; actionable CodeRabbit comments are addressed or unavailability is stated.
 
 ## Blocked by
 

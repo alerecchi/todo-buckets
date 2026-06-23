@@ -18,7 +18,6 @@ Extend board drag-and-drop so a signed-in user can drag a Todo from one Bucket t
 - [ ] Existing edit-dialog Bucket movement remains compatible with ordered Buckets.
 - [ ] Category and Tag behavior is unchanged by drag-and-drop movement.
 - [ ] Component tests cover cross-Bucket movement, empty-Bucket drop placement, exact destination persistence, completed Todo movement, and affected cache patching on success.
-- [ ] `pnpm run format`, `pnpm test`, and `cr --agent` have been run; actionable CodeRabbit comments are addressed or unavailability is stated.
 
 ## Blocked by
 

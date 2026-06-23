@@ -5,6 +5,8 @@ import type { TagDisplay } from '@/lib/types/Tag'
 import type { BucketDb, CategoryDbSelect, TagDbSelect, TodoDbInsert, TodoDbSelect } from '@/server/db/types'
 import { errorResponse } from '@/server/utils'
 
+const TODO_POSITION_GAP = 1024
+
 export const CreateTodoInput = z
   .object({
     bucketId: z.int(),
@@ -62,6 +64,8 @@ export type TodoRepository = {
   findOwnedCategory: (userId: string, categoryId: number) => Promise<CategoryDbSelect | undefined>
   findOwnedTags: (userId: string, tagIds: Array<number>) => Promise<Array<TagDbSelect>>
   findOwnedTodoWithBucket: (userId: string, todoId: number) => Promise<TodoWithBucket | undefined>
+  getMaxTodoPosition: (userId: string, bucketId: number) => Promise<number | null>
+  // Returns Todos in persisted Todo Position order for the requested Bucket.
   getTodosByBucketForUser: (userId: string, bucketId: number) => Promise<Array<TodoWithCategoryDisplay>>
   replaceTodoTags: (todoId: number, userId: string, tagIds: Array<number>) => Promise<void>
   updateTodo: (todoId: number, userId: string, updates: Partial<TodoDbInsert>) => Promise<TodoDbSelect | undefined>
@@ -94,6 +98,7 @@ export async function createTodoForUser({ data, now = () => new Date(), reposito
   const category = await requireOwnedCategoryIfPresent(repository, userId, data.categoryId)
   const tagIds = getUniqueTagIds(data.tagIds ?? [])
   const tags = await requireOwnedTags(repository, userId, tagIds)
+  const maxPosition = await repository.getMaxTodoPosition(userId, data.bucketId)
 
   const todo = await repository.createTodo({
     bucketId: data.bucketId,
@@ -101,6 +106,7 @@ export async function createTodoForUser({ data, now = () => new Date(), reposito
     completed: false,
     createdAt: now(),
     description: data.description?.trim() ?? '',
+    position: getNextTodoPosition(maxPosition),
     title: data.title,
     userId,
   })
@@ -126,8 +132,11 @@ export async function updateTodoForUser({ data, repository, userId }: UpdateTodo
     throw errorResponse(409, 'Cannot update a Todo in an archived Bucket')
   }
 
-  if (data.bucketId !== undefined && data.bucketId !== existingTodo.bucketId) {
-    await requireOwnedActiveBucket(repository, userId, data.bucketId)
+  const destinationBucketId =
+    data.bucketId !== undefined && data.bucketId !== existingTodo.bucketId ? data.bucketId : undefined
+
+  if (destinationBucketId !== undefined) {
+    await requireOwnedActiveBucket(repository, userId, destinationBucketId)
   }
   const category =
     data.categoryId === undefined
@@ -137,12 +146,17 @@ export async function updateTodoForUser({ data, repository, userId }: UpdateTodo
     data.tagIds === undefined
       ? existingTodo.tags.map(toTagDisplay)
       : await requireOwnedTags(repository, userId, getUniqueTagIds(data.tagIds))
+  const position =
+    destinationBucketId === undefined
+      ? undefined
+      : getNextTodoPosition(await repository.getMaxTodoPosition(userId, destinationBucketId))
 
   const updates = {
     bucketId: data.bucketId,
     categoryId: data.categoryId,
     completed: data.completed,
     description: data.description?.trim(),
+    position,
     title: data.title,
   }
   const updatedTodo = await repository.updateTodo(data.id, userId, removeUndefinedValues(updates))
@@ -250,4 +264,8 @@ function removeUndefinedValues<T extends Record<string, unknown>>(values: T) {
 
 function getUniqueTagIds(tagIds: Array<number>) {
   return [...new Set(tagIds)]
+}
+
+function getNextTodoPosition(maxPosition: number | null) {
+  return (maxPosition ?? 0) + TODO_POSITION_GAP
 }

@@ -198,6 +198,7 @@ async function seedPrimaryUserTodos(
   seedTags: Array<typeof tags.$inferSelect>,
   now: Date,
 ) {
+  const todoCountByBucketId = new Map<number, number>()
   const seedTodos = await db
     .insert(todos)
     .values(
@@ -205,6 +206,8 @@ async function seedPrimaryUserTodos(
         const todoIndex = index + 1
         const bucket = seedBuckets[index % seedBuckets.length]
         const category = todoIndex <= 5 ? seedCategories[index % seedCategories.length] : undefined
+        const bucketTodoCount = (todoCountByBucketId.get(bucket.id) ?? 0) + 1
+        todoCountByBucketId.set(bucket.id, bucketTodoCount)
 
         return {
           bucketId: bucket.id,
@@ -212,6 +215,7 @@ async function seedPrimaryUserTodos(
           completed: false,
           createdAt: new Date(now.getTime() + todoIndex * 1000),
           description: `Seed todo description ${String(todoIndex).padStart(2, '0')}`,
+          position: bucketTodoCount * 1024,
           title: `Seed Todo ${String(todoIndex).padStart(2, '0')}`,
           userId: 'seed-user-aaa',
         }

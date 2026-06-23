@@ -82,6 +82,7 @@ const existingTodo = {
   createdAt: new Date('2026-06-10T10:00:00.000Z'),
   description: 'Bring notes',
   id: 10,
+  position: 1024,
   tags: [
     {
       colorKey: tag.colorKey,

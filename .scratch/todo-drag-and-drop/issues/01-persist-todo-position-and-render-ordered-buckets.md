@@ -15,7 +15,6 @@ Make Todo Position part of the durable Todo domain model. A signed-in user's Tod
 - [ ] Existing create and edit flows continue to work without changing Category, Tag, completion, or edit-dialog behavior.
 - [ ] Server behavior tests cover create-at-bottom and ordered reads.
 - [ ] Relevant migration/schema changes are included and generated consistently with the project's Drizzle setup.
-- [ ] `pnpm run format`, `pnpm test`, and `cr --agent` have been run; actionable CodeRabbit comments are addressed or unavailability is stated.
 
 ## Blocked by
 

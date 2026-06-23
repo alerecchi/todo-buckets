@@ -17,7 +17,6 @@ Make the board layout support practical drag-and-drop across long Buckets and na
 - [ ] Layout changes do not introduce overlapping text or unstable Todo card dimensions at desktop or narrow viewport sizes.
 - [ ] Component or interaction tests cover fixed-width columns, internal Bucket scrolling, horizontal drag scrolling, and current-Bucket-only vertical drag scrolling where practical.
 - [ ] Manual verification notes cover dragging into a scrolled position in a long Bucket and horizontal board dragging on a narrow viewport.
-- [ ] `pnpm run format`, `pnpm test`, and `cr --agent` have been run; actionable CodeRabbit comments are addressed or unavailability is stated.
 
 ## Blocked by
 

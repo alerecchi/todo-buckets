@@ -14,7 +14,6 @@ Polish the create flow for ordered Buckets so a newly created Todo appears at th
 - [ ] Existing create success cache patching remains scoped to the destination Bucket.
 - [ ] Create behavior tests cover create-at-bottom and destination-Bucket cache patching.
 - [ ] Scroll-to-new-Todo behavior is covered by a focused component test where practical; otherwise manual verification notes explain the limitation.
-- [ ] `pnpm run format`, `pnpm test`, and `cr --agent` have been run; actionable CodeRabbit comments are addressed or unavailability is stated.
 
 ## Blocked by
 
