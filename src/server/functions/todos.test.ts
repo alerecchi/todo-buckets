@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   CreateTodoInput,
+  MoveTodoInput,
   UpdateTodoInput,
   createTodoForUser,
   deleteTodoForUser,
   getTodosForUser,
+  moveTodoForUser,
   updateTodoForUser,
 } from './todos.core'
 import type { TodoRepository } from './todos.core'
@@ -72,6 +74,7 @@ const createRepository = (overrides: Partial<TodoRepository> = {}): TodoReposito
   findOwnedTodoWithBucket: vi.fn(),
   getMaxTodoPosition: vi.fn(() => Promise.resolve(null)),
   getTodosByBucketForUser: vi.fn(() => Promise.resolve([])),
+  moveTodo: vi.fn(),
   replaceTodoTags: vi.fn(() => Promise.resolve()),
   updateTodo: vi.fn(),
   ...overrides,
@@ -531,6 +534,340 @@ describe('todo server behavior', () => {
       tags: [],
       title: existingTodo.title,
     })
+  })
+
+  it('moves a Todo between adjacent anchors in the same Bucket without accepting a client position', async () => {
+    const beforeTodo = {
+      ...existingTodo,
+      id: 11,
+      position: 2048,
+      title: 'Before anchor',
+    }
+    const afterTodo = {
+      ...existingTodo,
+      id: 12,
+      position: 4096,
+      title: 'After anchor',
+    }
+    const repository = createRepository({
+      findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(existingTodo)),
+      getTodosByBucketForUser: vi.fn(() => Promise.resolve([existingTodo, beforeTodo, afterTodo])),
+      moveTodo: vi.fn((todoId, userId, move) =>
+        Promise.resolve({
+          status: 'moved' as const,
+          todo: {
+            ...existingTodo,
+            bucketId: move.bucketId,
+            id: todoId,
+            position: move.position,
+            userId,
+          },
+        }),
+      ),
+    })
+
+    const result = await moveTodoForUser({
+      data: MoveTodoInput.parse({
+        afterTodoId: afterTodo.id,
+        beforeTodoId: beforeTodo.id,
+        id: existingTodo.id,
+        targetBucketId: activeBucket.id,
+      }),
+      repository,
+      userId: activeBucket.userId,
+    })
+
+    expect(repository.moveTodo).toHaveBeenCalledWith(existingTodo.id, activeBucket.userId, {
+      bucketId: activeBucket.id,
+      expectedMovedTodoPosition: existingTodo.position,
+      expectedSourceBucketId: existingTodo.bucketId,
+      expectedTargetTodoPositions: [
+        { bucketId: activeBucket.id, id: beforeTodo.id, position: beforeTodo.position },
+        { bucketId: activeBucket.id, id: afterTodo.id, position: afterTodo.position },
+      ],
+      position: 3072,
+      rebalancedTodoPositions: [],
+    })
+    expect(result).toMatchObject({
+      affectedBucketIds: [activeBucket.id],
+      affectedTodoPositions: [{ bucketId: activeBucket.id, id: existingTodo.id, position: 3072 }],
+      todo: {
+        bucketId: activeBucket.id,
+        id: existingTodo.id,
+        position: 3072,
+      },
+    })
+  })
+
+  it('moves a Todo between adjacent anchors in another Bucket and returns both affected Buckets', async () => {
+    const beforeTodo = {
+      ...existingTodo,
+      bucket: otherActiveBucket,
+      bucketId: otherActiveBucket.id,
+      id: 21,
+      position: 1024,
+      title: 'Target before anchor',
+    }
+    const afterTodo = {
+      ...beforeTodo,
+      id: 22,
+      position: 2048,
+      title: 'Target after anchor',
+    }
+    const repository = createRepository({
+      findOwnedActiveBucket: vi.fn((userId, bucketId) =>
+        Promise.resolve(
+          userId === activeBucket.userId && bucketId === otherActiveBucket.id ? otherActiveBucket : undefined,
+        ),
+      ),
+      findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(existingTodo)),
+      getTodosByBucketForUser: vi.fn(() => Promise.resolve([beforeTodo, afterTodo])),
+      moveTodo: vi.fn((todoId, userId, move) =>
+        Promise.resolve({
+          status: 'moved' as const,
+          todo: {
+            ...existingTodo,
+            bucketId: move.bucketId,
+            id: todoId,
+            position: move.position,
+            userId,
+          },
+        }),
+      ),
+    })
+
+    const result = await moveTodoForUser({
+      data: {
+        afterTodoId: afterTodo.id,
+        beforeTodoId: beforeTodo.id,
+        id: existingTodo.id,
+        targetBucketId: otherActiveBucket.id,
+      },
+      repository,
+      userId: activeBucket.userId,
+    })
+
+    expect(repository.moveTodo).toHaveBeenCalledWith(existingTodo.id, activeBucket.userId, {
+      bucketId: otherActiveBucket.id,
+      expectedMovedTodoPosition: existingTodo.position,
+      expectedSourceBucketId: existingTodo.bucketId,
+      expectedTargetTodoPositions: [
+        { bucketId: otherActiveBucket.id, id: beforeTodo.id, position: beforeTodo.position },
+        { bucketId: otherActiveBucket.id, id: afterTodo.id, position: afterTodo.position },
+      ],
+      position: 1536,
+      rebalancedTodoPositions: [],
+    })
+    expect(result.affectedBucketIds).toEqual([activeBucket.id, otherActiveBucket.id])
+    expect(result.todo).toMatchObject({
+      bucketId: otherActiveBucket.id,
+      id: existingTodo.id,
+      position: 1536,
+    })
+  })
+
+  it('rejects a stale Todo anchor without moving the Todo', async () => {
+    const beforeTodo = {
+      ...existingTodo,
+      id: 31,
+      position: 1024,
+      title: 'Still present anchor',
+    }
+    const repository = createRepository({
+      findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(existingTodo)),
+      getTodosByBucketForUser: vi.fn(() => Promise.resolve([beforeTodo])),
+    })
+
+    await expect(
+      moveTodoForUser({
+        data: {
+          afterTodoId: 999,
+          beforeTodoId: beforeTodo.id,
+          id: existingTodo.id,
+          targetBucketId: activeBucket.id,
+        },
+        repository,
+        userId: activeBucket.userId,
+      }),
+    ).rejects.toHaveProperty('status', 409)
+
+    expect(repository.moveTodo).not.toHaveBeenCalled()
+  })
+
+  it('rejects Todo anchors that are valid but no longer adjacent', async () => {
+    const beforeTodo = {
+      ...existingTodo,
+      id: 41,
+      position: 1024,
+      title: 'Before anchor',
+    }
+    const interveningTodo = {
+      ...existingTodo,
+      id: 42,
+      position: 2048,
+      title: 'Intervening Todo',
+    }
+    const afterTodo = {
+      ...existingTodo,
+      id: 43,
+      position: 3072,
+      title: 'After anchor',
+    }
+    const repository = createRepository({
+      findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(existingTodo)),
+      getTodosByBucketForUser: vi.fn(() => Promise.resolve([beforeTodo, interveningTodo, afterTodo])),
+    })
+
+    await expect(
+      moveTodoForUser({
+        data: {
+          afterTodoId: afterTodo.id,
+          beforeTodoId: beforeTodo.id,
+          id: existingTodo.id,
+          targetBucketId: activeBucket.id,
+        },
+        repository,
+        userId: activeBucket.userId,
+      }),
+    ).rejects.toHaveProperty('status', 409)
+
+    expect(repository.moveTodo).not.toHaveBeenCalled()
+  })
+
+  it('rejects moving a Todo to an archived or unauthorized target Bucket', async () => {
+    const repository = createRepository({
+      findOwnedActiveBucket: vi.fn(() => Promise.resolve(undefined)),
+      findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(existingTodo)),
+    })
+
+    await expect(
+      moveTodoForUser({
+        data: {
+          id: existingTodo.id,
+          targetBucketId: otherActiveBucket.id,
+        },
+        repository,
+        userId: activeBucket.userId,
+      }),
+    ).rejects.toHaveProperty('status', 404)
+
+    expect(repository.findOwnedActiveBucket).toHaveBeenCalledWith(activeBucket.userId, otherActiveBucket.id)
+    expect(repository.getTodosByBucketForUser).not.toHaveBeenCalled()
+    expect(repository.moveTodo).not.toHaveBeenCalled()
+  })
+
+  it("rejects moving another user's Todo", async () => {
+    const repository = createRepository({
+      findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(undefined)),
+    })
+
+    await expect(
+      moveTodoForUser({
+        data: {
+          id: existingTodo.id,
+          targetBucketId: activeBucket.id,
+        },
+        repository,
+        userId: activeBucket.userId,
+      }),
+    ).rejects.toHaveProperty('status', 404)
+
+    expect(repository.findOwnedActiveBucket).not.toHaveBeenCalled()
+    expect(repository.moveTodo).not.toHaveBeenCalled()
+  })
+
+  it('does not expose Todo Position as editable move input', () => {
+    expect(
+      MoveTodoInput.safeParse({
+        id: existingTodo.id,
+        position: 2048,
+        targetBucketId: activeBucket.id,
+      }).success,
+    ).toBe(false)
+  })
+
+  it('surfaces stale repository move results as an explicit conflict', async () => {
+    const beforeTodo = {
+      ...existingTodo,
+      id: 61,
+      position: 1024,
+      title: 'Before anchor',
+    }
+    const repository = createRepository({
+      findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(existingTodo)),
+      getTodosByBucketForUser: vi.fn(() => Promise.resolve([beforeTodo])),
+      moveTodo: vi.fn(() => Promise.resolve({ status: 'conflict' as const })),
+    })
+
+    await expect(
+      moveTodoForUser({
+        data: {
+          beforeTodoId: beforeTodo.id,
+          id: existingTodo.id,
+          targetBucketId: activeBucket.id,
+        },
+        repository,
+        userId: activeBucket.userId,
+      }),
+    ).rejects.toHaveProperty('status', 409)
+  })
+
+  it('rebalances target Bucket positions when adjacent anchors leave no integer gap', async () => {
+    const beforeTodo = {
+      ...existingTodo,
+      id: 51,
+      position: 1024,
+      title: 'Before anchor',
+    }
+    const afterTodo = {
+      ...existingTodo,
+      id: 52,
+      position: 1025,
+      title: 'After anchor',
+    }
+    const repository = createRepository({
+      findOwnedTodoWithBucket: vi.fn(() => Promise.resolve(existingTodo)),
+      getTodosByBucketForUser: vi.fn(() => Promise.resolve([existingTodo, beforeTodo, afterTodo])),
+      moveTodo: vi.fn((todoId, userId, move) =>
+        Promise.resolve({
+          status: 'moved' as const,
+          todo: {
+            ...existingTodo,
+            bucketId: move.bucketId,
+            id: todoId,
+            position: move.position,
+            userId,
+          },
+        }),
+      ),
+    })
+
+    const result = await moveTodoForUser({
+      data: {
+        afterTodoId: afterTodo.id,
+        beforeTodoId: beforeTodo.id,
+        id: existingTodo.id,
+        targetBucketId: activeBucket.id,
+      },
+      repository,
+      userId: activeBucket.userId,
+    })
+
+    expect(repository.moveTodo).toHaveBeenCalledWith(existingTodo.id, activeBucket.userId, {
+      bucketId: activeBucket.id,
+      expectedMovedTodoPosition: existingTodo.position,
+      expectedSourceBucketId: existingTodo.bucketId,
+      expectedTargetTodoPositions: [
+        { bucketId: activeBucket.id, id: beforeTodo.id, position: beforeTodo.position },
+        { bucketId: activeBucket.id, id: afterTodo.id, position: afterTodo.position },
+      ],
+      position: 2048,
+      rebalancedTodoPositions: [{ bucketId: activeBucket.id, id: afterTodo.id, position: 3072 }],
+    })
+    expect(result.affectedTodoPositions).toEqual([
+      { bucketId: activeBucket.id, id: afterTodo.id, position: 3072 },
+      { bucketId: activeBucket.id, id: existingTodo.id, position: 2048 },
+    ])
   })
 
   it('rejects moving a Todo to an archived Bucket', async () => {

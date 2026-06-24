@@ -9,10 +9,12 @@ import {
   CreateTodoInput,
   DeleteTodoInput,
   GetTodosInput,
+  MoveTodoInput,
   UpdateTodoInput,
   createTodoForUser,
   deleteTodoForUser,
   getTodosForUser,
+  moveTodoForUser,
   updateTodoForUser,
 } from '@/server/functions/todos.core'
 import { authRequiredMiddleware } from '@/server/middlewares/auth-middleware'
@@ -44,6 +46,17 @@ export const updateTodo = createServerFn({ method: 'POST' })
   .inputValidator(UpdateTodoInput)
   .handler(async ({ data, context }) => {
     return updateTodoForUser({
+      data,
+      repository: todoRepository,
+      userId: context.session.user.id,
+    })
+  })
+
+export const moveTodo = createServerFn({ method: 'POST' })
+  .middleware([authRequiredMiddleware])
+  .inputValidator(MoveTodoInput)
+  .handler(async ({ data, context }) => {
+    return moveTodoForUser({
       data,
       repository: todoRepository,
       userId: context.session.user.id,
@@ -140,6 +153,95 @@ const todoRepository: TodoRepository = {
 
     return bucketTodos.map(withTags)
   },
+  async moveTodo(todoId, userId, move) {
+    const sourceBucket = await db.query.buckets.findFirst({
+      columns: {
+        id: true,
+      },
+      where: and(eq(buckets.id, move.expectedSourceBucketId), eq(buckets.userId, userId), eq(buckets.status, 'active')),
+    })
+
+    if (!sourceBucket) {
+      return { status: 'conflict' }
+    }
+
+    const targetBucket = await db.query.buckets.findFirst({
+      columns: {
+        id: true,
+      },
+      where: and(eq(buckets.id, move.bucketId), eq(buckets.userId, userId), eq(buckets.status, 'active')),
+    })
+
+    if (!targetBucket) {
+      return { status: 'conflict' }
+    }
+
+    const currentTargetTodoPositions = (
+      await db.query.todos.findMany({
+        columns: {
+          bucketId: true,
+          id: true,
+          position: true,
+        },
+        orderBy: [asc(todos.position), asc(todos.id)],
+        where: and(eq(todos.bucketId, move.bucketId), eq(todos.userId, userId)),
+      })
+    ).filter((todo) => todo.id !== todoId)
+
+    if (!areTodoPositionsEqual(currentTargetTodoPositions, move.expectedTargetTodoPositions)) {
+      return { status: 'conflict' }
+    }
+
+    for (const todoPosition of move.rebalancedTodoPositions) {
+      const expectedTodoPosition = move.expectedTargetTodoPositions.find((todo) => todo.id === todoPosition.id)
+
+      if (!expectedTodoPosition) {
+        return { status: 'conflict' }
+      }
+
+      const updatedTodoPositions = await db
+        .update(todos)
+        .set({ position: todoPosition.position })
+        .where(
+          and(
+            eq(todos.id, todoPosition.id),
+            eq(todos.userId, userId),
+            eq(todos.bucketId, todoPosition.bucketId),
+            eq(todos.position, expectedTodoPosition.position),
+          ),
+        )
+        .returning({ id: todos.id })
+
+      if (updatedTodoPositions.length === 0) {
+        return { status: 'conflict' }
+      }
+    }
+
+    const updatedTodos = await db
+      .update(todos)
+      .set({
+        bucketId: move.bucketId,
+        position: move.position,
+      })
+      .where(
+        and(
+          eq(todos.id, todoId),
+          eq(todos.userId, userId),
+          eq(todos.bucketId, move.expectedSourceBucketId),
+          eq(todos.position, move.expectedMovedTodoPosition),
+        ),
+      )
+      .returning()
+
+    if (updatedTodos.length === 0) {
+      return { status: 'conflict' }
+    }
+
+    return {
+      status: 'moved',
+      todo: updatedTodos[0],
+    }
+  },
   async replaceTodoTags(todoId: number, userId: string, tagIds: Array<number>) {
     const ownedTodo = await db.query.todos.findFirst({
       columns: {
@@ -168,6 +270,24 @@ const todoRepository: TodoRepository = {
       .returning()
     return updatedTodo
   },
+}
+
+function areTodoPositionsEqual(
+  currentTodos: Array<{ bucketId: number; id: number; position: number }>,
+  expectedTodos: Array<{ bucketId: number; id: number; position: number }>,
+) {
+  return (
+    currentTodos.length === expectedTodos.length &&
+    currentTodos.every((currentTodo, index) => {
+      const expectedTodo = expectedTodos[index]
+
+      return (
+        currentTodo.bucketId === expectedTodo.bucketId &&
+        currentTodo.id === expectedTodo.id &&
+        currentTodo.position === expectedTodo.position
+      )
+    })
+  )
 }
 
 function withTags<T extends { todoTags: Array<{ tag: Pick<TagDbSelect, 'colorKey' | 'id' | 'name'> }> }>(todo: T) {

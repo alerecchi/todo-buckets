@@ -35,6 +35,15 @@ export const UpdateTodoInput = z
   })
   .strict()
 
+export const MoveTodoInput = z
+  .object({
+    afterTodoId: z.int().optional(),
+    beforeTodoId: z.int().optional(),
+    id: z.int(),
+    targetBucketId: z.int(),
+  })
+  .strict()
+
 export const DeleteTodoInput = z
   .object({
     id: z.int(),
@@ -57,6 +66,16 @@ export type TodoWithCategoryDisplay = TodoDbSelect & {
   tags: Array<TagDisplay>
 }
 
+export type TodoPositionPatch = Pick<TodoDbSelect, 'bucketId' | 'id' | 'position'>
+
+export type MovedTodo = {
+  affectedBucketIds: Array<number>
+  affectedTodoPositions: Array<TodoPositionPatch>
+  todo: TodoWithCategoryDisplay
+}
+
+export type MoveTodoResult = { status: 'conflict' } | { status: 'moved'; todo: TodoDbSelect } | { status: 'not_found' }
+
 export type TodoRepository = {
   createTodo: (todo: TodoDbInsert) => Promise<TodoDbSelect>
   deleteTodo: (todoId: number, userId: string) => Promise<DeletedTodo | undefined>
@@ -67,6 +86,18 @@ export type TodoRepository = {
   getMaxTodoPosition: (userId: string, bucketId: number) => Promise<number | null>
   // Returns Todos in persisted Todo Position order for the requested Bucket.
   getTodosByBucketForUser: (userId: string, bucketId: number) => Promise<Array<TodoWithCategoryDisplay>>
+  moveTodo: (
+    todoId: number,
+    userId: string,
+    move: {
+      bucketId: number
+      expectedMovedTodoPosition: number
+      expectedSourceBucketId: number
+      expectedTargetTodoPositions: Array<TodoPositionPatch>
+      position: number
+      rebalancedTodoPositions: Array<TodoPositionPatch>
+    },
+  ) => Promise<MoveTodoResult>
   replaceTodoTags: (todoId: number, userId: string, tagIds: Array<number>) => Promise<void>
   updateTodo: (todoId: number, userId: string, updates: Partial<TodoDbInsert>) => Promise<TodoDbSelect | undefined>
 }
@@ -87,6 +118,10 @@ type GetTodosDependencies = OperationDependencies & {
 
 type UpdateTodoDependencies = OperationDependencies & {
   data: z.output<typeof UpdateTodoInput>
+}
+
+type MoveTodoDependencies = OperationDependencies & {
+  data: z.output<typeof MoveTodoInput>
 }
 
 type DeleteTodoDependencies = OperationDependencies & {
@@ -170,6 +205,65 @@ export async function updateTodoForUser({ data, repository, userId }: UpdateTodo
   }
 
   return withDisplayData(updatedTodo, category, tags)
+}
+
+export async function moveTodoForUser({ data, repository, userId }: MoveTodoDependencies): Promise<MovedTodo> {
+  const existingTodo = await repository.findOwnedTodoWithBucket(userId, data.id)
+
+  if (!existingTodo) {
+    throw errorResponse(404, 'Todo not found or unauthorized')
+  }
+
+  if (existingTodo.bucket.status === 'archived') {
+    throw errorResponse(409, 'Cannot move a Todo from an archived Bucket')
+  }
+
+  await requireOwnedActiveBucket(repository, userId, data.targetBucketId)
+
+  const targetTodos = (await repository.getTodosByBucketForUser(userId, data.targetBucketId)).filter(
+    (todo) => todo.id !== data.id,
+  )
+  const { position, rebalancedTodoPositions } = getMovePositionFromAnchors({
+    afterTodoId: data.afterTodoId,
+    beforeTodoId: data.beforeTodoId,
+    targetBucketId: data.targetBucketId,
+    targetTodos,
+  })
+  const moveResult = await repository.moveTodo(data.id, userId, {
+    bucketId: data.targetBucketId,
+    expectedMovedTodoPosition: existingTodo.position,
+    expectedSourceBucketId: existingTodo.bucketId,
+    expectedTargetTodoPositions: targetTodos.map(toTodoPositionPatch),
+    position,
+    rebalancedTodoPositions,
+  })
+
+  if (moveResult.status === 'conflict') {
+    throw errorResponse(409, 'Todo move conflict; refresh and retry')
+  }
+
+  if (moveResult.status === 'not_found') {
+    throw errorResponse(404, 'Todo not found or unauthorized')
+  }
+
+  const movedTodo = withDisplayData(
+    moveResult.todo,
+    toCategoryDisplay(existingTodo.category),
+    existingTodo.tags.map(toTagDisplay),
+  )
+
+  return {
+    affectedBucketIds: getUniqueBucketIds([existingTodo.bucketId, data.targetBucketId]),
+    affectedTodoPositions: [
+      ...rebalancedTodoPositions,
+      {
+        bucketId: movedTodo.bucketId,
+        id: movedTodo.id,
+        position: movedTodo.position,
+      },
+    ],
+    todo: movedTodo,
+  }
 }
 
 export async function deleteTodoForUser({ data, repository, userId }: DeleteTodoDependencies) {
@@ -268,4 +362,142 @@ function getUniqueTagIds(tagIds: Array<number>) {
 
 function getNextTodoPosition(maxPosition: number | null) {
   return (maxPosition ?? 0) + TODO_POSITION_GAP
+}
+
+function getMovePositionFromAnchors({
+  afterTodoId,
+  beforeTodoId,
+  targetBucketId,
+  targetTodos,
+}: {
+  afterTodoId: number | undefined
+  beforeTodoId: number | undefined
+  targetBucketId: number
+  targetTodos: Array<TodoWithCategoryDisplay>
+}) {
+  const beforeTodo = beforeTodoId === undefined ? undefined : targetTodos.find((todo) => todo.id === beforeTodoId)
+  const afterTodo = afterTodoId === undefined ? undefined : targetTodos.find((todo) => todo.id === afterTodoId)
+
+  if (beforeTodoId !== undefined && !beforeTodo) {
+    throw errorResponse(409, 'Before Todo anchor is stale, invalid, or unauthorized')
+  }
+
+  if (afterTodoId !== undefined && !afterTodo) {
+    throw errorResponse(409, 'After Todo anchor is stale, invalid, or unauthorized')
+  }
+
+  if (!beforeTodo && !afterTodo) {
+    return {
+      position: getNextTodoPosition(targetTodos.at(-1)?.position ?? null),
+      rebalancedTodoPositions: [],
+    }
+  }
+
+  if (beforeTodo && afterTodo) {
+    const beforeIndex = targetTodos.findIndex((todo) => todo.id === beforeTodo.id)
+    const afterIndex = targetTodos.findIndex((todo) => todo.id === afterTodo.id)
+
+    if (afterIndex !== beforeIndex + 1) {
+      throw errorResponse(409, 'Todo anchors are not adjacent in the target Bucket')
+    }
+
+    const position = Math.floor((beforeTodo.position + afterTodo.position) / 2)
+
+    if (position > beforeTodo.position && position < afterTodo.position) {
+      return {
+        position,
+        rebalancedTodoPositions: [],
+      }
+    }
+
+    return rebalancePositionsForMove({
+      insertionIndex: beforeIndex + 1,
+      targetBucketId,
+      targetTodos,
+    })
+  }
+
+  if (beforeTodo) {
+    const beforeIndex = targetTodos.findIndex((todo) => todo.id === beforeTodo.id)
+
+    if (beforeIndex !== targetTodos.length - 1) {
+      throw errorResponse(409, 'Before Todo anchor is not the last Todo in the target Bucket')
+    }
+
+    return {
+      position: beforeTodo.position + TODO_POSITION_GAP,
+      rebalancedTodoPositions: [],
+    }
+  }
+
+  const afterIndex = targetTodos.findIndex((todo) => todo.id === afterTodo!.id)
+
+  if (afterIndex !== 0) {
+    throw errorResponse(409, 'After Todo anchor is not the first Todo in the target Bucket')
+  }
+
+  const position = Math.floor(afterTodo!.position / 2)
+
+  if (position > 0 && position < afterTodo!.position) {
+    return {
+      position,
+      rebalancedTodoPositions: [],
+    }
+  }
+
+  return rebalancePositionsForMove({
+    insertionIndex: 0,
+    targetBucketId,
+    targetTodos,
+  })
+}
+
+function getUniqueBucketIds(bucketIds: Array<number>) {
+  return [...new Set(bucketIds)]
+}
+
+function toTodoPositionPatch(todo: TodoWithCategoryDisplay): TodoPositionPatch {
+  return {
+    bucketId: todo.bucketId,
+    id: todo.id,
+    position: todo.position,
+  }
+}
+
+function rebalancePositionsForMove({
+  insertionIndex,
+  targetBucketId,
+  targetTodos,
+}: {
+  insertionIndex: number
+  targetBucketId: number
+  targetTodos: Array<TodoWithCategoryDisplay>
+}) {
+  let position = TODO_POSITION_GAP
+  const rebalancedTodoPositions: Array<TodoPositionPatch> = []
+
+  for (let index = 0; index <= targetTodos.length; index += 1) {
+    const nextPosition = (index + 1) * TODO_POSITION_GAP
+
+    if (index === insertionIndex) {
+      position = nextPosition
+      continue
+    }
+
+    const todoIndex = index < insertionIndex ? index : index - 1
+    const todo = targetTodos[todoIndex]
+
+    if (todo.position !== nextPosition) {
+      rebalancedTodoPositions.push({
+        bucketId: targetBucketId,
+        id: todo.id,
+        position: nextPosition,
+      })
+    }
+  }
+
+  return {
+    position,
+    rebalancedTodoPositions,
+  }
 }
