@@ -5,6 +5,14 @@ import { afterAll, afterEach, beforeAll } from 'vitest'
 
 export let server: SetupServer
 
+class TestResizeObserver {
+  disconnect() {}
+  observe() {}
+  unobserve() {}
+}
+
+globalThis.ResizeObserver = TestResizeObserver
+
 beforeAll(async () => {
   server = await createServerWithoutNodeLocalStorageWarning()
   server.listen({

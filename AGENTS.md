@@ -19,6 +19,7 @@ The current stack is:
 - React compiler enabled;
 - TanStack Query for data fetching;
 - TanStack Form, all form code MUST use TanStack Form to the fullest;
+- @dnd-kit/react for drag-and-drop mechanics;
 - Better Auth for authentication;
 - Zod for validation;
 - Drizzle as a DB ORM (using a Neon backend)

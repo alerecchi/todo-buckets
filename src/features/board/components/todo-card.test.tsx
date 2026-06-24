@@ -47,6 +47,12 @@ const todoWithTags = {
 } satisfies Todo
 
 describe('TodoCard', () => {
+  it('exposes a dedicated drag handle', () => {
+    render(<TodoCard todo={todoWithCategory} />)
+
+    expect(screen.getByRole('button', { name: 'Drag Pay rent' })).toBeInTheDocument()
+  })
+
   it('uses the Category color as the left border', () => {
     render(<TodoCard todo={todoWithCategory} />)
 
