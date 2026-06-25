@@ -230,9 +230,17 @@ describe('Todo card edit dialog', () => {
   })
 
   it('saves a Bucket change from edit mode', async () => {
+    const laterDestinationTodo = {
+      ...existingTodo,
+      bucketId: buckets[0].id,
+      id: 20,
+      position: 4096,
+      title: 'Later destination review',
+    }
     const movedTodo = {
       ...existingTodo,
       bucketId: buckets[0].id,
+      position: 2048,
       title: 'Plan moved review',
     }
     const staleMovedTodo = {
@@ -244,7 +252,7 @@ describe('Todo card edit dialog', () => {
     mockedUpdateTodo.mockResolvedValue(movedTodo)
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([TODOS_QUERY_KEY, existingTodo.bucketId], [existingTodo])
-    queryClient.setQueryData([TODOS_QUERY_KEY, buckets[0].id], [staleMovedTodo])
+    queryClient.setQueryData([TODOS_QUERY_KEY, buckets[0].id], [laterDestinationTodo, staleMovedTodo])
 
     render(<BucketColumn bucket={buckets[1]} buckets={buckets} />, { queryClient })
 
@@ -266,7 +274,7 @@ describe('Todo card edit dialog', () => {
       })
     })
     expect(queryClient.getQueryData([TODOS_QUERY_KEY, existingTodo.bucketId])).toEqual([])
-    expect(queryClient.getQueryData([TODOS_QUERY_KEY, buckets[0].id])).toEqual([movedTodo])
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, buckets[0].id])).toEqual([movedTodo, laterDestinationTodo])
   })
 
   it('keeps edit mode open and shows feedback when saving Todo edits fails', async () => {

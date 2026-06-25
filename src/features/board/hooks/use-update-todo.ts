@@ -48,8 +48,11 @@ function moveTodo(queryClient: QueryClient, oldBucketId: number, updatedTodo: To
   queryClient.setQueryData<Array<Todo>>([TODOS_QUERY_KEY, oldBucketId], (cache = []) =>
     cache.filter((todo) => todo.id !== updatedTodo.id),
   )
-  queryClient.setQueryData<Array<Todo>>([TODOS_QUERY_KEY, updatedTodo.bucketId], (cache = []) => [
-    ...cache.filter((todo) => todo.id !== updatedTodo.id),
-    updatedTodo,
-  ])
+  queryClient.setQueryData<Array<Todo>>([TODOS_QUERY_KEY, updatedTodo.bucketId], (cache = []) =>
+    [...cache.filter((todo) => todo.id !== updatedTodo.id), updatedTodo].toSorted(compareTodoPosition),
+  )
+}
+
+function compareTodoPosition(left: Todo, right: Todo) {
+  return left.position - right.position || left.id - right.id
 }

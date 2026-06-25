@@ -4,29 +4,62 @@ import { TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
 import type { Todo } from '@/lib/types/Todo'
 import { moveTodo } from '@/server/functions/todos'
 
-type MoveTodoVariables = Parameters<typeof moveTodo>[0]
+type MoveTodoVariables = Parameters<typeof moveTodo>[0] & {
+  sourceBucketId?: number
+}
 
 export function useMoveTodo() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (variables: MoveTodoVariables) => moveTodo(variables),
+    mutationFn: (variables: MoveTodoVariables) => moveTodo({ data: variables.data }),
     onMutate: (variables) => {
-      const previousTodos = queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, variables.data.targetBucketId])
+      const previousTargetTodos = queryClient.getQueryData<Array<Todo>>([
+        TODOS_QUERY_KEY,
+        variables.data.targetBucketId,
+      ])
+      const previousSourceTodos =
+        variables.sourceBucketId === undefined || variables.sourceBucketId === variables.data.targetBucketId
+          ? undefined
+          : queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, variables.sourceBucketId])
+
+      if (variables.sourceBucketId !== undefined && variables.sourceBucketId !== variables.data.targetBucketId) {
+        const movedTodo = previousSourceTodos?.find((todo) => todo.id === variables.data.id)
+
+        if (movedTodo) {
+          queryClient.setQueryData<Array<Todo>>([TODOS_QUERY_KEY, variables.sourceBucketId], (cache = []) =>
+            cache.filter((todo) => todo.id !== variables.data.id),
+          )
+          queryClient.setQueryData<Array<Todo>>([TODOS_QUERY_KEY, variables.data.targetBucketId], (cache = []) =>
+            insertTodoInCache(
+              cache,
+              { ...movedTodo, bucketId: variables.data.targetBucketId },
+              variables.data.beforeTodoId,
+              variables.data.afterTodoId,
+            ),
+          )
+        }
+
+        return { previousSourceTodos, previousTargetTodos, sourceBucketId: variables.sourceBucketId }
+      }
 
       queryClient.setQueryData<Array<Todo>>([TODOS_QUERY_KEY, variables.data.targetBucketId], (cache = []) =>
         moveTodoInCache(cache, variables.data.id, variables.data.beforeTodoId, variables.data.afterTodoId),
       )
 
-      return { previousTodos }
+      return { previousTargetTodos }
     },
     onError: (_error, variables, context) => {
-      queryClient.setQueryData([TODOS_QUERY_KEY, variables.data.targetBucketId], context?.previousTodos)
+      queryClient.setQueryData([TODOS_QUERY_KEY, variables.data.targetBucketId], context?.previousTargetTodos)
+
+      if (context?.sourceBucketId !== undefined) {
+        queryClient.setQueryData([TODOS_QUERY_KEY, context.sourceBucketId], context.previousSourceTodos)
+      }
     },
     onSuccess: (result) => {
       for (const bucketId of result.affectedBucketIds) {
         queryClient.setQueryData<Array<Todo>>([TODOS_QUERY_KEY, bucketId], (cache = []) =>
-          patchMovedTodoCache(cache, result.todo, result.affectedTodoPositions),
+          patchMovedTodoCache(bucketId, cache, result.todo, result.affectedTodoPositions),
         )
       }
     },
@@ -46,6 +79,17 @@ function moveTodoInCache(
   }
 
   const remainingTodos = todos.filter((todo) => todo.id !== movedTodoId)
+
+  return insertTodoInCache(remainingTodos, movedTodo, beforeTodoId, afterTodoId)
+}
+
+function insertTodoInCache(
+  todos: Array<Todo>,
+  movedTodo: Todo,
+  beforeTodoId: number | undefined,
+  afterTodoId: number | undefined,
+) {
+  const remainingTodos = todos.filter((todo) => todo.id !== movedTodo.id)
   const insertionIndex = getInsertionIndex(remainingTodos, beforeTodoId, afterTodoId)
 
   return remainingTodos.toSpliced(insertionIndex, 0, movedTodo)
@@ -66,22 +110,29 @@ function getInsertionIndex(todos: Array<Todo>, beforeTodoId: number | undefined,
 }
 
 function patchMovedTodoCache(
+  bucketId: number,
   todos: Array<Todo>,
   movedTodo: Todo,
   affectedTodoPositions: Array<Pick<Todo, 'bucketId' | 'id' | 'position'>>,
 ) {
   const positionsById = new Map(affectedTodoPositions.map((todoPosition) => [todoPosition.id, todoPosition.position]))
-  const patchedTodos = todos.map((todo) => {
-    if (todo.id === movedTodo.id) {
-      return movedTodo
-    }
+  const patchedTodos = todos
+    .filter((todo) => bucketId === movedTodo.bucketId || todo.id !== movedTodo.id)
+    .map((todo) => {
+      if (todo.id === movedTodo.id) {
+        return movedTodo
+      }
 
-    const position = positionsById.get(todo.id)
+      const position = positionsById.get(todo.id)
 
-    return position === undefined ? todo : { ...todo, position }
-  })
+      return position === undefined ? todo : { ...todo, position }
+    })
 
-  if (!patchedTodos.some((todo) => todo.id === movedTodo.id) && movedTodo.bucketId === todos[0]?.bucketId) {
+  if (bucketId !== movedTodo.bucketId) {
+    return patchedTodos.toSorted(compareTodoPosition)
+  }
+
+  if (!patchedTodos.some((todo) => todo.id === movedTodo.id)) {
     return [...patchedTodos, movedTodo].toSorted(compareTodoPosition)
   }
 

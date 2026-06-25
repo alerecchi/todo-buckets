@@ -32,19 +32,51 @@ function manualChunks(id: string) {
     return
   }
 
-  if (id.includes('@tanstack')) {
+  const packageName = getPackageName(id)
+
+  if (!packageName) {
+    return 'vendor'
+  }
+
+  if (packageName.startsWith('@tanstack/')) {
     return 'tanstack'
   }
 
-  if (id.includes('@base-ui') || id.includes('lucide-react')) {
+  if (packageName.startsWith('@base-ui/') || packageName === 'lucide-react') {
     return 'ui'
   }
 
-  if (id.includes('react') || id.includes('react-dom')) {
+  if (packageName.startsWith('@dnd-kit/')) {
+    return 'dnd'
+  }
+
+  if (packageName === 'react' || packageName === 'react-dom' || packageName === 'scheduler') {
     return 'react'
   }
 
   return 'vendor'
+}
+
+function getPackageName(id: string) {
+  const modulePathIndex = id.lastIndexOf('node_modules/')
+
+  if (modulePathIndex === -1) {
+    return
+  }
+
+  const modulePath = id.slice(modulePathIndex + 'node_modules/'.length)
+
+  if (!modulePath) {
+    return
+  }
+
+  const parts = modulePath.split('/')
+
+  if (parts[0]?.startsWith('@')) {
+    return `${parts[0]}/${parts[1]}`
+  }
+
+  return parts[0]
 }
 
 export default config

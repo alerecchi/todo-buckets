@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { BucketColumn } from '@/features/board/components/bucket-column'
+import { TodoDragDropProvider } from '@/features/board/components/todo-drag-drop-provider'
 import { TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
 import type { Bucket } from '@/lib/types/Bucket'
 import type { Todo } from '@/lib/types/Todo'
@@ -70,12 +71,24 @@ const bucket = {
   userId: 'user-1',
 } satisfies Bucket
 
-const buckets = [bucket] satisfies Array<Bucket>
+const destinationBucket = {
+  id: 3,
+  period: '2026-06',
+  type: 'monthly',
+  userId: 'user-1',
+} satisfies Bucket
+
+const buckets = [bucket, destinationBucket] satisfies Array<Bucket>
 
 const todos = [
   createTodo({ id: 10, position: 1024, title: 'First todo' }),
   createTodo({ id: 20, position: 2048, title: 'Second todo' }),
   createTodo({ id: 30, position: 3072, title: 'Third todo' }),
+] satisfies Array<Todo>
+
+const destinationTodos = [
+  createTodo({ bucketId: destinationBucket.id, id: 40, position: 1024, title: 'Destination first' }),
+  createTodo({ bucketId: destinationBucket.id, id: 50, position: 2048, title: 'Destination second' }),
 ] satisfies Array<Todo>
 
 const mockedMoveTodo = vi.mocked(moveTodo)
@@ -96,7 +109,7 @@ describe('Todo reordering within a Bucket', () => {
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
 
-    render(<BucketColumn bucket={bucket} buckets={buckets} />, { queryClient })
+    renderBucket(bucket, queryClient)
 
     expect(screen.getByRole('button', { name: 'Drag Second todo' })).toBeInTheDocument()
 
@@ -133,7 +146,7 @@ describe('Todo reordering within a Bucket', () => {
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
 
-    render(<BucketColumn bucket={bucket} buckets={buckets} />, { queryClient })
+    renderBucket(bucket, queryClient)
 
     act(() => {
       dnd.dragEnd?.({
@@ -169,7 +182,7 @@ describe('Todo reordering within a Bucket', () => {
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
 
-    render(<BucketColumn bucket={bucket} buckets={buckets} />, { queryClient })
+    renderBucket(bucket, queryClient)
 
     act(() => {
       dnd.dragEnd?.({
@@ -204,7 +217,7 @@ describe('Todo reordering within a Bucket', () => {
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
 
-    render(<BucketColumn bucket={bucket} buckets={buckets} />, { queryClient })
+    renderBucket(bucket, queryClient)
 
     act(() => {
       dnd.dragEnd?.({
@@ -236,7 +249,7 @@ describe('Todo reordering within a Bucket', () => {
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
 
-    render(<BucketColumn bucket={bucket} buckets={buckets} />, { queryClient })
+    renderBucket(bucket, queryClient)
 
     act(() => {
       dnd.dragEnd?.({
@@ -274,7 +287,7 @@ describe('Todo reordering within a Bucket', () => {
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
 
-    render(<BucketColumn bucket={bucket} buckets={buckets} />, { queryClient })
+    renderBucket(bucket, queryClient)
 
     act(() => {
       dnd.dragEnd?.({
@@ -312,7 +325,7 @@ describe('Todo reordering within a Bucket', () => {
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
 
-    render(<BucketColumn bucket={bucket} buckets={buckets} />, { queryClient })
+    renderBucket(bucket, queryClient)
 
     expect(screen.getByTestId(`bucket-${bucket.id}-insertion-0`)).toHaveAttribute('data-drop-target', 'false')
     expect(screen.getByTestId(`bucket-${bucket.id}-insertion-1`)).toHaveAttribute('data-drop-target', 'true')
@@ -326,7 +339,7 @@ describe('Todo reordering within a Bucket', () => {
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], completedTodos)
 
-    render(<BucketColumn bucket={bucket} buckets={buckets} />, { queryClient })
+    renderBucket(bucket, queryClient)
 
     expect(screen.getByRole('button', { name: 'Drag Second todo' })).toBeInTheDocument()
 
@@ -360,9 +373,286 @@ describe('Todo reordering within a Bucket', () => {
   })
 })
 
-function createTodo({ id, position, title }: { id: number; position: number; title: string }): Todo {
+describe('Bucket column layout', () => {
+  it('uses stable equal-width flex sizing so unrelated Buckets do not reflow during moves', () => {
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
+
+    renderBucket(bucket, queryClient)
+
+    expect(screen.getByText(bucket.type).closest('.my-6')).toHaveClass('min-w-0', 'basis-0', 'flex-1')
+  })
+})
+
+describe('Todo movement across Buckets', () => {
+  beforeEach(() => {
+    dnd.activeDropTargetId = null
+    dnd.dragEnd = undefined
+    mockedMoveTodo.mockReset()
+    mockedMoveTodo.mockResolvedValue({
+      affectedBucketIds: [bucket.id, destinationBucket.id],
+      affectedTodoPositions: [{ bucketId: destinationBucket.id, id: todos[1].id, position: 1536 }],
+      todo: { ...todos[1], bucketId: destinationBucket.id, position: 1536, userId: 'user-1' },
+    })
+  })
+
+  it('moves a Todo to another Bucket at the visible insertion line', async () => {
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
+    queryClient.setQueryData([TODOS_QUERY_KEY, destinationBucket.id], destinationTodos)
+
+    render(
+      <TodoDragDropProvider>
+        <BucketColumn bucket={bucket} buckets={buckets} />
+        <BucketColumn bucket={destinationBucket} buckets={buckets} />
+      </TodoDragDropProvider>,
+      { queryClient },
+    )
+
+    act(() => {
+      dnd.dragEnd?.({
+        canceled: false,
+        operation: {
+          source: { data: { bucketId: bucket.id, kind: 'todo', todoId: todos[1].id } },
+          target: {
+            data: {
+              afterTodoId: destinationTodos[1].id,
+              beforeTodoId: destinationTodos[0].id,
+              bucketId: destinationBucket.id,
+              kind: 'todo-insertion',
+            },
+            id: `bucket-${destinationBucket.id}-insertion-1`,
+          },
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(mockedMoveTodo).toHaveBeenCalledWith({
+        data: {
+          afterTodoId: destinationTodos[1].id,
+          beforeTodoId: destinationTodos[0].id,
+          id: todos[1].id,
+          targetBucketId: destinationBucket.id,
+        },
+      })
+    })
+  })
+
+  it('removes the moved Todo from the source cache and inserts it into the destination cache after success', async () => {
+    const movedTodo = { ...todos[1], bucketId: destinationBucket.id, position: 1536, userId: 'user-1' }
+    mockedMoveTodo.mockResolvedValue({
+      affectedBucketIds: [bucket.id, destinationBucket.id],
+      affectedTodoPositions: [
+        { bucketId: destinationBucket.id, id: destinationTodos[0].id, position: 1024 },
+        { bucketId: destinationBucket.id, id: movedTodo.id, position: movedTodo.position },
+        { bucketId: destinationBucket.id, id: destinationTodos[1].id, position: 2048 },
+      ],
+      todo: movedTodo,
+    })
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
+    queryClient.setQueryData([TODOS_QUERY_KEY, destinationBucket.id], destinationTodos)
+
+    render(
+      <TodoDragDropProvider>
+        <BucketColumn bucket={bucket} buckets={buckets} />
+        <BucketColumn bucket={destinationBucket} buckets={buckets} />
+      </TodoDragDropProvider>,
+      { queryClient },
+    )
+
+    act(() => {
+      dnd.dragEnd?.({
+        canceled: false,
+        operation: {
+          source: { data: { bucketId: bucket.id, kind: 'todo', todoId: todos[1].id } },
+          target: {
+            data: {
+              afterTodoId: destinationTodos[1].id,
+              beforeTodoId: destinationTodos[0].id,
+              bucketId: destinationBucket.id,
+              kind: 'todo-insertion',
+            },
+            id: `bucket-${destinationBucket.id}-insertion-1`,
+          },
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, bucket.id])?.map((todo) => todo.id)).toEqual([
+        todos[0].id,
+        todos[2].id,
+      ])
+      expect(
+        queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, destinationBucket.id])?.map((todo) => todo.id),
+      ).toEqual([destinationTodos[0].id, movedTodo.id, destinationTodos[1].id])
+    })
+  })
+
+  it('optimistically moves a Todo across Buckets before the server responds', () => {
+    mockedMoveTodo.mockReturnValue(new Promise(() => {}))
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
+    queryClient.setQueryData([TODOS_QUERY_KEY, destinationBucket.id], destinationTodos)
+
+    render(
+      <TodoDragDropProvider>
+        <BucketColumn bucket={bucket} buckets={buckets} />
+        <BucketColumn bucket={destinationBucket} buckets={buckets} />
+      </TodoDragDropProvider>,
+      { queryClient },
+    )
+
+    act(() => {
+      dnd.dragEnd?.({
+        canceled: false,
+        operation: {
+          source: { data: { bucketId: bucket.id, kind: 'todo', todoId: todos[1].id } },
+          target: {
+            data: {
+              afterTodoId: destinationTodos[1].id,
+              beforeTodoId: destinationTodos[0].id,
+              bucketId: destinationBucket.id,
+              kind: 'todo-insertion',
+            },
+            id: `bucket-${destinationBucket.id}-insertion-1`,
+          },
+        },
+      })
+    })
+
+    expect(queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, bucket.id])?.map((todo) => todo.id)).toEqual([
+      todos[0].id,
+      todos[2].id,
+    ])
+    expect(
+      queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, destinationBucket.id])?.map((todo) => todo.id),
+    ).toEqual([destinationTodos[0].id, todos[1].id, destinationTodos[1].id])
+  })
+
+  it('moves a Todo into an empty Bucket from its top insertion line', async () => {
+    const movedTodo = { ...todos[0], bucketId: destinationBucket.id, position: 1024, userId: 'user-1' }
+    dnd.activeDropTargetId = `bucket-${destinationBucket.id}-insertion-0`
+    mockedMoveTodo.mockResolvedValue({
+      affectedBucketIds: [bucket.id, destinationBucket.id],
+      affectedTodoPositions: [{ bucketId: destinationBucket.id, id: movedTodo.id, position: movedTodo.position }],
+      todo: movedTodo,
+    })
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
+    queryClient.setQueryData([TODOS_QUERY_KEY, destinationBucket.id], [])
+
+    render(
+      <TodoDragDropProvider>
+        <BucketColumn bucket={bucket} buckets={buckets} />
+        <BucketColumn bucket={destinationBucket} buckets={buckets} />
+      </TodoDragDropProvider>,
+      { queryClient },
+    )
+
+    expect(screen.getByTestId(`bucket-${destinationBucket.id}-insertion-0`)).toHaveAttribute('data-drop-target', 'true')
+
+    act(() => {
+      dnd.dragEnd?.({
+        canceled: false,
+        operation: {
+          source: { data: { bucketId: bucket.id, kind: 'todo', todoId: todos[0].id } },
+          target: {
+            data: {
+              afterTodoId: undefined,
+              beforeTodoId: undefined,
+              bucketId: destinationBucket.id,
+              kind: 'todo-insertion',
+            },
+            id: `bucket-${destinationBucket.id}-insertion-0`,
+          },
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(mockedMoveTodo).toHaveBeenCalledWith({
+        data: {
+          id: todos[0].id,
+          targetBucketId: destinationBucket.id,
+        },
+      })
+      expect(queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, bucket.id])?.map((todo) => todo.id)).toEqual([
+        todos[1].id,
+        todos[2].id,
+      ])
+      expect(queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, destinationBucket.id])).toEqual([movedTodo])
+    })
+  })
+
+  it('moves a completed Todo across Buckets with the same insertion-line anchors', async () => {
+    const completedTodos = [todos[0], { ...todos[1], completed: true }, todos[2]]
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], completedTodos)
+    queryClient.setQueryData([TODOS_QUERY_KEY, destinationBucket.id], destinationTodos)
+
+    render(
+      <TodoDragDropProvider>
+        <BucketColumn bucket={bucket} buckets={buckets} />
+        <BucketColumn bucket={destinationBucket} buckets={buckets} />
+      </TodoDragDropProvider>,
+      { queryClient },
+    )
+
+    act(() => {
+      dnd.dragEnd?.({
+        canceled: false,
+        operation: {
+          source: { data: { bucketId: bucket.id, kind: 'todo', todoId: todos[1].id } },
+          target: {
+            data: {
+              afterTodoId: undefined,
+              beforeTodoId: destinationTodos[1].id,
+              bucketId: destinationBucket.id,
+              kind: 'todo-insertion',
+            },
+            id: `bucket-${destinationBucket.id}-insertion-2`,
+          },
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(mockedMoveTodo).toHaveBeenCalledWith({
+        data: {
+          beforeTodoId: destinationTodos[1].id,
+          id: todos[1].id,
+          targetBucketId: destinationBucket.id,
+        },
+      })
+    })
+  })
+})
+
+function renderBucket(bucketToRender: Bucket, queryClient: ReturnType<typeof createTestQueryClient>) {
+  return render(
+    <TodoDragDropProvider>
+      <BucketColumn bucket={bucketToRender} buckets={buckets} />
+    </TodoDragDropProvider>,
+    { queryClient },
+  )
+}
+
+function createTodo({
+  bucketId = bucket.id,
+  id,
+  position,
+  title,
+}: {
+  bucketId?: number
+  id: number
+  position: number
+  title: string
+}): Todo {
   return {
-    bucketId: bucket.id,
+    bucketId,
     category: null,
     categoryId: null,
     completed: false,

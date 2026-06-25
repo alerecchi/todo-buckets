@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 
 import { BucketColumn } from '@/features/board/components/bucket-column'
+import { TodoDragDropProvider } from '@/features/board/components/todo-drag-drop-provider'
 import { getBucketsQueryOptions } from '@/features/board/queries/todo-queries'
 import type { Bucket } from '@/lib/types/Bucket'
 
@@ -18,11 +19,13 @@ export function Board() {
 
   return (
     // TODO possibly "h-screen" and "container" on a higher level div
-    <div className='container mx-auto flex h-screen flex-row gap-6'>
-      {sortedBuckets.map((bucket: Bucket) => (
-        <BucketColumn key={bucket.id} bucket={bucket} buckets={sortedBuckets} />
-      ))}
-    </div>
+    <TodoDragDropProvider>
+      <div className='container mx-auto flex h-screen flex-row gap-6'>
+        {sortedBuckets.map((bucket: Bucket) => (
+          <BucketColumn key={bucket.id} bucket={bucket} buckets={sortedBuckets} />
+        ))}
+      </div>
+    </TodoDragDropProvider>
   )
 }
 // const deleteMutation = useMutation({
