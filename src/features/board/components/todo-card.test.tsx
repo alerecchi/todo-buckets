@@ -107,6 +107,12 @@ describe('TodoCard', () => {
     expect(screen.getByText('focus')).toHaveClass('[--todo-marker-fg:var(--color-teal-700)]')
   })
 
+  it('does not render descriptions in the board card view', () => {
+    render(<TodoCard todo={{ ...todoWithCategory, description: 'Only shown while editing this todo.' }} />)
+
+    expect(screen.queryByText('Only shown while editing this todo.')).not.toBeInTheDocument()
+  })
+
   it('mutes Tag color styling when the Todo is completed', () => {
     render(<TodoCard todo={{ ...todoWithTags, completed: true }} />)
 

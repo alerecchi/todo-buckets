@@ -16,6 +16,10 @@ _Avoid_: Bucket size, bucket level.
 The nearest active bucket with a broader enabled horizon than another bucket, or the inbox when no broader time-based horizon exists. Bucket migrations can move todos back to this bucket.
 _Avoid_: Parent bucket, previous level.
 
+**Most Granular Bucket**:
+The active bucket with the narrowest enabled horizon for a user. In the current product this is the daily bucket, but future settings may make weekly or monthly the most granular bucket.
+_Avoid_: Last bucket, leaf bucket.
+
 **Current Period**:
 The calendar span represented by a bucket horizon for a specific user at a specific moment, calculated in that user's timezone.
 _Avoid_: UTC period, server date.
@@ -36,6 +40,10 @@ _Avoid_: Display date, selected date.
 The moment when a time-based bucket's period has ended in the user's timezone. An expired bucket no longer represents the current period for its horizon.
 _Avoid_: Due date, deadline.
 
+**Lifecycle Reconciliation**:
+The process that aligns a user's active buckets with their Planning Date. It creates needed current buckets, archives buckets that need no attention, and starts a migration flow when incomplete todos require user choices.
+_Avoid_: Sync, refresh.
+
 **Bucket Migration**:
 The review of incomplete todos from an expired or completed bucket, where each todo is either carried into the next period for that bucket horizon or moved back to the broader bucket.
 _Avoid_: Rollover, cleanup.
@@ -43,6 +51,10 @@ _Avoid_: Rollover, cleanup.
 **Migration Flow**:
 A sequence of one or more bucket migrations presented to the user when multiple buckets need attention. Each step migrates one bucket before moving to the next bucket.
 _Avoid_: Batch migration, bulk rollover.
+
+**Completion Recap**:
+A summary shown when the user manually completes a bucket, before the bucket is closed or migrated. It gives feedback on completed and incomplete todos for that bucket.
+_Avoid_: Report, retrospective.
 
 **Todo**:
 An item of work that a user wants to remember, plan, or complete within a bucket. User-facing text may call this a task when that reads more naturally.

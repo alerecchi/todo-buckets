@@ -151,6 +151,16 @@ describe('CreateTodoButton', () => {
   it('creates a todo in the selected bucket, closes, and patches only that bucket cache', async () => {
     mockedCreateTodo.mockResolvedValue(createdTodo)
     const queryClient = createTestQueryClient()
+    const bucketList = document.createElement('div')
+    const scrollTo = vi.fn()
+    Object.assign(bucketList.dataset, { bucketId: '2', bucketTodoList: '' })
+    Object.defineProperty(bucketList, 'scrollHeight', { value: 640 })
+    bucketList.scrollTo = scrollTo
+    document.body.append(bucketList)
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(0)
+      return 1
+    })
     queryClient.setQueryData([TODOS_QUERY_KEY, 1], [existingTodo])
     queryClient.setQueryData([TODOS_QUERY_KEY, 2], [])
 
@@ -176,6 +186,10 @@ describe('CreateTodoButton', () => {
     })
     expect(queryClient.getQueryData([TODOS_QUERY_KEY, 1])).toEqual([existingTodo])
     expect(queryClient.getQueryData([TODOS_QUERY_KEY, 2])).toEqual([createdTodo])
+    expect(scrollTo).toHaveBeenCalledWith({ behavior: 'smooth', top: 640 })
+
+    bucketList.remove()
+    vi.unstubAllGlobals()
   })
 
   it('creates a Category from the picker, selects it, and saves the Todo with it', async () => {

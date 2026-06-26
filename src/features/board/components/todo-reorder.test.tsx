@@ -2,9 +2,10 @@ import { act, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Board } from '@/features/board/components/board'
 import { BucketColumn } from '@/features/board/components/bucket-column'
 import { TodoDragDropProvider } from '@/features/board/components/todo-drag-drop-provider'
-import { TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
+import { BUCKETS_QUERY_KEY, TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
 import type { Bucket } from '@/lib/types/Bucket'
 import type { Todo } from '@/lib/types/Todo'
 import { moveTodo } from '@/server/functions/todos'
@@ -13,11 +14,21 @@ import { createTestQueryClient, render } from '@/test'
 const dnd = vi.hoisted(() => ({
   activeDropTargetId: null as string | null,
   dragEnd: undefined as ((event: unknown) => void) | undefined,
+  dragMove: undefined as ((event: unknown, manager: unknown) => void) | undefined,
 }))
 
 vi.mock('@dnd-kit/react', () => ({
-  DragDropProvider: ({ children, onDragEnd }: { children: ReactNode; onDragEnd: (event: unknown) => void }) => {
+  DragDropProvider: ({
+    children,
+    onDragEnd,
+    onDragMove,
+  }: {
+    children: ReactNode
+    onDragEnd: (event: unknown) => void
+    onDragMove?: (event: unknown, manager: unknown) => void
+  }) => {
     dnd.dragEnd = onDragEnd
+    dnd.dragMove = onDragMove
 
     return <>{children}</>
   },
@@ -96,6 +107,7 @@ const mockedMoveTodo = vi.mocked(moveTodo)
 describe('Todo reordering within a Bucket', () => {
   beforeEach(() => {
     dnd.activeDropTargetId = null
+    dnd.dragMove = undefined
     dnd.dragEnd = undefined
     mockedMoveTodo.mockReset()
     mockedMoveTodo.mockResolvedValue({
@@ -374,13 +386,92 @@ describe('Todo reordering within a Bucket', () => {
 })
 
 describe('Bucket column layout', () => {
-  it('uses stable equal-width flex sizing so unrelated Buckets do not reflow during moves', () => {
+  it('keeps Buckets readable in a horizontally scrolling board with independently scrolling Todo lists', () => {
     const queryClient = createTestQueryClient()
+    queryClient.setQueryData([BUCKETS_QUERY_KEY], buckets)
     queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
+    queryClient.setQueryData([TODOS_QUERY_KEY, destinationBucket.id], destinationTodos)
 
-    renderBucket(bucket, queryClient)
+    render(<Board />, { queryClient })
 
-    expect(screen.getByText(bucket.type).closest('.my-6')).toHaveClass('min-w-0', 'basis-0', 'flex-1')
+    expect(screen.getByRole('region', { name: 'Todo Buckets board' })).toHaveClass(
+      'h-[calc(100dvh-3.5rem)]',
+      'overflow-x-auto',
+      'overflow-y-hidden',
+    )
+
+    const bucketSections = screen.getAllByRole('region')
+    expect(bucketSections).toHaveLength(3)
+    expect(screen.getByRole('region', { name: 'daily' })).toHaveClass('h-full', 'w-80', 'shrink-0')
+
+    expect(screen.getByRole('heading', { name: 'daily' }).closest('header')).toHaveClass('sticky', 'top-0')
+    expect(screen.getByRole('list', { name: 'daily Todos' })).toHaveClass(
+      'overflow-y-auto',
+      'min-h-0',
+      'overscroll-y-none',
+      'pt-2',
+    )
+    expect(screen.getByRole('button', { name: 'Drag First todo' }).closest('[data-slot="card"]')).toHaveClass(
+      'shrink-0',
+    )
+  })
+
+  it('scrolls the board horizontally during drag near the board edge', () => {
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([BUCKETS_QUERY_KEY], buckets)
+    queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
+    queryClient.setQueryData([TODOS_QUERY_KEY, destinationBucket.id], destinationTodos)
+
+    render(<Board />, { queryClient })
+
+    const board = screen.getByRole('region', { name: 'Todo Buckets board' })
+    board.scrollBy = vi.fn()
+    board.getBoundingClientRect = () =>
+      ({
+        bottom: 700,
+        height: 700,
+        left: 0,
+        right: 800,
+        top: 0,
+        width: 800,
+        x: 0,
+        y: 0,
+      }) as DOMRect
+
+    act(() => {
+      dnd.dragMove?.(
+        { operation: { target: { data: { bucketId: bucket.id, kind: 'todo-insertion' } } } },
+        { dragOperation: { position: { current: { x: 792, y: 240 } } } },
+      )
+    })
+
+    expect(board.scrollBy).toHaveBeenCalledWith({ left: 24 })
+  })
+
+  it('scrolls only the current Bucket Todo list vertically during drag', () => {
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([BUCKETS_QUERY_KEY], buckets)
+    queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
+    queryClient.setQueryData([TODOS_QUERY_KEY, destinationBucket.id], destinationTodos)
+
+    render(<Board />, { queryClient })
+
+    const sourceList = screen.getByRole('list', { name: 'daily Todos' })
+    const destinationList = screen.getByRole('list', { name: 'monthly Todos' })
+    sourceList.scrollBy = vi.fn()
+    destinationList.scrollBy = vi.fn()
+    sourceList.getBoundingClientRect = () => createDomRect({ bottom: 620, left: 0, right: 320, top: 120 })
+    destinationList.getBoundingClientRect = () => createDomRect({ bottom: 620, left: 344, right: 664, top: 120 })
+
+    act(() => {
+      dnd.dragMove?.(
+        { operation: { target: { data: { bucketId: destinationBucket.id, kind: 'todo-insertion' } } } },
+        { dragOperation: { position: { current: { x: 500, y: 612 } } } },
+      )
+    })
+
+    expect(sourceList.scrollBy).not.toHaveBeenCalled()
+    expect(destinationList.scrollBy).toHaveBeenCalledWith({ top: 24 })
   })
 })
 
@@ -663,4 +754,17 @@ function createTodo({
     tags: [],
     title,
   }
+}
+
+function createDomRect({ bottom, left, right, top }: { bottom: number; left: number; right: number; top: number }) {
+  return {
+    bottom,
+    height: bottom - top,
+    left,
+    right,
+    top,
+    width: right - left,
+    x: left,
+    y: top,
+  } as DOMRect
 }

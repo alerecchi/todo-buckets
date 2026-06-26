@@ -23,18 +23,27 @@ export function BucketColumn({ bucket, buckets }: BucketProps) {
   const { data: todoList = [] } = useSuspenseQuery(getTodosQueryOptions(bucket.id))
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null)
   const { icon: Icon, textColor, bgColor } = bucketStyles[bucket.type]
+  const headingId = `bucket-${bucket.id}-heading`
 
   return (
-    <div className='my-6 flex min-w-0 flex-1 basis-0 flex-col gap-4'>
-      <div className='flex flex-row items-center gap-2'>
+    <section aria-labelledby={headingId} className='flex h-full min-h-0 w-80 shrink-0 flex-col gap-4'>
+      <header className='sticky top-0 z-10 flex shrink-0 flex-row items-center gap-2 bg-background py-1'>
         <div className={cn('rounded-sm p-2', textColor, bgColor)}>
           <Icon className='size-6' />
         </div>
-        <span className={cn('block text-xl font-semibold capitalize', textColor)}>{bucket.type}</span>
+        <h2 className={cn('block text-xl font-semibold capitalize', textColor)} id={headingId}>
+          {bucket.type}
+        </h2>
         <Badge className={cn(textColor, bgColor)}>{todoList.length}</Badge>
         <AddTodoButton bucketId={bucket.id} buckets={buckets} />
-      </div>
-      <div className='flex min-w-0 flex-auto flex-col rounded-lg bg-secondary'>
+      </header>
+      <div
+        aria-label={`${bucket.type} Todos`}
+        className='flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-none rounded-lg bg-secondary pt-2'
+        data-bucket-id={bucket.id}
+        data-bucket-todo-list
+        role='list'
+      >
         <TodoInsertionLine bucketId={bucket.id} index={0} afterTodoId={todoList[0]?.id} />
         {todoList
           .map((todoItem) => (
@@ -62,7 +71,7 @@ export function BucketColumn({ bucket, buckets }: BucketProps) {
           }
         }}
       />
-    </div>
+    </section>
   )
 }
 

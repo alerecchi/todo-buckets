@@ -9,8 +9,23 @@ export default function useCreateTodo() {
 
   return useMutation({
     mutationFn: createTodo,
-    onSuccess: (newTodo: Todo) =>
-      // TODO check if I have to await query cache updates
-      queryClient.setQueryData<Array<Todo>>([TODOS_QUERY_KEY, newTodo.bucketId], (old = []) => [...old, newTodo]),
+    onSuccess: (newTodo: Todo) => {
+      queryClient.setQueryData<Array<Todo>>([TODOS_QUERY_KEY, newTodo.bucketId], (old = []) => [...old, newTodo])
+      scrollBucketTodoListToEnd(newTodo.bucketId)
+    },
+  })
+}
+
+function scrollBucketTodoListToEnd(bucketId: number) {
+  if (typeof document === 'undefined' || typeof requestAnimationFrame === 'undefined') {
+    return
+  }
+
+  requestAnimationFrame(() => {
+    const bucketList = document.querySelector<HTMLElement>(
+      `[data-bucket-todo-list][data-bucket-id="${bucketId}"]`,
+    )
+
+    bucketList?.scrollTo({ behavior: 'smooth', top: bucketList.scrollHeight })
   })
 }

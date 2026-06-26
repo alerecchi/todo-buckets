@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 
 import type { TodoDragData } from '@/features/board/components/sortable-todo-card'
 import { useMoveTodo } from '@/features/board/hooks/use-move-todo'
+import { scrollTodoBoard } from '@/features/board/lib/board-auto-scroll'
 
 type TodoInsertionData = {
   afterTodoId?: number
@@ -14,6 +15,22 @@ type TodoInsertionData = {
 
 export function TodoDragDropProvider({ children }: { children: ReactNode }) {
   const { mutate: moveTodo } = useMoveTodo()
+
+  const handleDragMove = (event: unknown, manager: unknown) => {
+    if (typeof document === 'undefined') {
+      return
+    }
+
+    const targetData = getDragMoveTargetData(event)
+    const currentBucketId = isTodoInsertionData(targetData) ? targetData.bucketId : undefined
+
+    scrollTodoBoard({
+      board: document.querySelector<HTMLElement>('[data-todo-board]'),
+      bucketLists: Array.from(document.querySelectorAll<HTMLElement>('[data-bucket-todo-list]')),
+      currentBucketId,
+      pointer: getDragMovePointer(manager),
+    })
+  }
 
   const handleDragEnd = (event: DragEndEvent) => {
     if (event.canceled) {
@@ -42,7 +59,11 @@ export function TodoDragDropProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  return <DragDropProvider onDragEnd={handleDragEnd}>{children}</DragDropProvider>
+  return (
+    <DragDropProvider onDragEnd={handleDragEnd} onDragMove={handleDragMove}>
+      {children}
+    </DragDropProvider>
+  )
 }
 
 function isTodoDragData(data: unknown): data is TodoDragData {
@@ -71,4 +92,60 @@ function isTodoInsertionData(data: unknown): data is TodoInsertionData {
 
 function removeUndefinedValues<T extends Record<string, unknown>>(values: T) {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) as T
+}
+
+function getDragMoveTargetData(event: unknown) {
+  if (typeof event !== 'object' || event === null || !('operation' in event)) {
+    return undefined
+  }
+
+  const operation = event.operation
+
+  if (typeof operation !== 'object' || operation === null || !('target' in operation)) {
+    return undefined
+  }
+
+  const target = operation.target
+
+  if (typeof target !== 'object' || target === null || !('data' in target)) {
+    return undefined
+  }
+
+  return target.data
+}
+
+function getDragMovePointer(manager: unknown) {
+  if (typeof manager !== 'object' || manager === null || !('dragOperation' in manager)) {
+    return null
+  }
+
+  const dragOperation = manager.dragOperation
+
+  if (typeof dragOperation !== 'object' || dragOperation === null || !('position' in dragOperation)) {
+    return null
+  }
+
+  const position = dragOperation.position
+
+  if (typeof position !== 'object' || position === null || !('current' in position)) {
+    return null
+  }
+
+  const pointer = position.current
+
+  if (
+    typeof pointer !== 'object' ||
+    pointer === null ||
+    !('x' in pointer) ||
+    typeof pointer.x !== 'number' ||
+    !('y' in pointer) ||
+    typeof pointer.y !== 'number'
+  ) {
+    return null
+  }
+
+  return {
+    x: pointer.x,
+    y: pointer.y,
+  }
 }

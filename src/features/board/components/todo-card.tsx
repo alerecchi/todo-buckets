@@ -5,7 +5,7 @@ import { memo } from 'react'
 import { useToggleTodo } from '@/features/board/hooks/use-update-todo'
 import { Badge } from '@/features/shared/components/ui/badge'
 import { Button } from '@/features/shared/components/ui/button'
-import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@/features/shared/components/ui/card'
+import { Card, CardAction, CardHeader, CardTitle } from '@/features/shared/components/ui/card'
 import { cn } from '@/features/shared/utils/tailwind'
 import { getColorPreset } from '@/lib/types/Color'
 import type { Todo } from '@/lib/types/Todo'
@@ -19,7 +19,6 @@ interface TodoCardProps {
 }
 
 function TodoCard({ dragHandleRef, draggableRef, isDragging = false, onEdit, todo }: TodoCardProps) {
-  const shouldShowDescription = !todo.completed && todo.description
   const categoryColor = todo.category ? getColorPreset(todo.category.colorKey) : undefined
   const { mutate: toggleTodoMutation } = useToggleTodo()
   const handleCheckedChange = () => {
@@ -38,7 +37,7 @@ function TodoCard({ dragHandleRef, draggableRef, isDragging = false, onEdit, tod
         onEdit?.(todo)
       }}
       className={cn(
-        'group m-2 shadow-sm ring-0',
+        'group m-2 shrink-0 shadow-sm ring-0',
         onEdit && 'cursor-pointer',
         isDragging && 'opacity-60',
         todo.category &&
@@ -49,7 +48,7 @@ function TodoCard({ dragHandleRef, draggableRef, isDragging = false, onEdit, tod
       ref={draggableRef}
     >
       <CardHeader>
-        <CardAction className={cn(!shouldShowDescription && 'row-span-1')}>
+        <CardAction className='row-span-1'>
           <div className='flex items-center gap-1'>
             <Button
               aria-label={`Drag ${todo.title}`}
@@ -100,7 +99,6 @@ function TodoCard({ dragHandleRef, draggableRef, isDragging = false, onEdit, tod
         <CardTitle className={cn(!todo.completed && 'font-bold', todo.completed && 'font-semibold text-slate-500')}>
           {todo.title}
         </CardTitle>
-        {shouldShowDescription && <CardDescription>{todo.description}</CardDescription>}
       </CardHeader>
     </Card>
   )
