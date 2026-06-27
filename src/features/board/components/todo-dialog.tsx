@@ -959,7 +959,7 @@ export default function TodoDialog({ buckets, defaultBucketId, editingTodo, isOp
             )}
             {todoDeleteError && <FieldError className='text-xs font-medium'>{todoDeleteError}</FieldError>}
           </div>
-          <DialogFooter className='shrink-0 sm:justify-between'>
+          <DialogFooter className={cn('shrink-0', isEditMode && 'sm:justify-between')}>
             {isEditMode && (
               <Button
                 type='button'

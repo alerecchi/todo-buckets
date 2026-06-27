@@ -8,6 +8,7 @@ import { flushSync } from 'react-dom'
 import type { TodoDragData } from '@/features/board/components/sortable-todo-card'
 import { useMoveTodo } from '@/features/board/hooks/use-move-todo'
 import { scrollTodoBoard } from '@/features/board/lib/board-auto-scroll'
+import { scrollBucketTodoListToEnd } from '@/features/board/lib/bucket-todo-list-scroll'
 import { TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
 import type { Todo } from '@/lib/types/Todo'
 
@@ -98,6 +99,10 @@ export function TodoDragDropProvider({ children }: { children: ReactNode }) {
         },
       },
     )
+
+    if (isFinalBucketInsertion(targetData)) {
+      scrollBucketTodoListToEnd(targetData.bucketId)
+    }
   }
 
   return (
@@ -139,6 +144,10 @@ function isTodoInsertionData(data: unknown): data is TodoInsertionData {
 
 function removeUndefinedValues<T extends Record<string, unknown>>(values: T) {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) as T
+}
+
+function isFinalBucketInsertion(targetData: TodoInsertionData) {
+  return targetData.beforeTodoId !== undefined && targetData.afterTodoId === undefined
 }
 
 function getDragMoveTargetData(event: unknown) {

@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import CreateTodoButton from '@/features/board/components/create-todo-button'
@@ -138,6 +138,20 @@ describe('CreateTodoButton', () => {
     fireEvent.click(closeButton)
   }
 
+  const appendBucketTodoList = (bucketId: number, scrollHeight: number | (() => number) = 640) => {
+    const bucketList = document.createElement('div')
+    const scrollTo = vi.fn()
+    Object.assign(bucketList.dataset, { bucketId: String(bucketId), bucketTodoList: '' })
+    Object.defineProperty(bucketList, 'scrollHeight', {
+      configurable: true,
+      get: typeof scrollHeight === 'function' ? scrollHeight : () => scrollHeight,
+    })
+    bucketList.scrollTo = scrollTo
+    document.body.append(bucketList)
+
+    return { bucketList, scrollTo }
+  }
+
   it('opens TodoDialog create mode with the current bucket selected', () => {
     render(<CreateTodoButton bucketId={1} buckets={buckets} />)
 
@@ -148,15 +162,67 @@ describe('CreateTodoButton', () => {
     expect(screen.getByLabelText('Bucket')).toHaveValue('1')
   })
 
+  it('creates a todo in the current bucket, appends it to that bucket cache, and reveals it', async () => {
+    const createdCurrentBucketTodo = {
+      ...createdTodo,
+      bucketId: 1,
+      id: 3,
+      position: 2048,
+    }
+    mockedCreateTodo.mockResolvedValue(createdCurrentBucketTodo)
+    const queryClient = createTestQueryClient()
+    let scrollHeight = 640
+    const animationFrameCallbacks: Array<FrameRequestCallback> = []
+    const { bucketList, scrollTo } = appendBucketTodoList(1, () => scrollHeight)
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      animationFrameCallbacks.push(callback)
+      return animationFrameCallbacks.length
+    })
+    queryClient.setQueryData([TODOS_QUERY_KEY, 1], [existingTodo])
+    queryClient.setQueryData([TODOS_QUERY_KEY, 2], [])
+
+    render(<CreateTodoButton bucketId={1} buckets={buckets} />, { queryClient })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add todo' }))
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Plan review' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Add New Task' })).not.toBeInTheDocument()
+    })
+    expect(mockedCreateTodo.mock.calls[0]?.[0]).toEqual({
+      data: {
+        bucketId: 1,
+        categoryId: null,
+        description: '',
+        tagIds: [],
+        title: 'Plan review',
+      },
+    })
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, 1])).toEqual([existingTodo, createdCurrentBucketTodo])
+    expect(queryClient.getQueryData([TODOS_QUERY_KEY, 2])).toEqual([])
+    await waitFor(() => {
+      expect(animationFrameCallbacks.length).toBeGreaterThan(0)
+    })
+    const firstFrameCallbacks = animationFrameCallbacks.splice(0)
+    act(() => {
+      firstFrameCallbacks.forEach((callback) => callback(0))
+    })
+    scrollHeight = 720
+    const secondFrameCallbacks = animationFrameCallbacks.splice(0)
+    act(() => {
+      secondFrameCallbacks.forEach((callback) => callback(16))
+    })
+    expect(scrollTo).toHaveBeenCalledWith({ behavior: 'smooth', top: 720 })
+
+    bucketList.remove()
+    vi.unstubAllGlobals()
+  })
+
   it('creates a todo in the selected bucket, closes, and patches only that bucket cache', async () => {
     mockedCreateTodo.mockResolvedValue(createdTodo)
     const queryClient = createTestQueryClient()
-    const bucketList = document.createElement('div')
-    const scrollTo = vi.fn()
-    Object.assign(bucketList.dataset, { bucketId: '2', bucketTodoList: '' })
-    Object.defineProperty(bucketList, 'scrollHeight', { value: 640 })
-    bucketList.scrollTo = scrollTo
-    document.body.append(bucketList)
+    const { bucketList, scrollTo } = appendBucketTodoList(2)
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0)
       return 1

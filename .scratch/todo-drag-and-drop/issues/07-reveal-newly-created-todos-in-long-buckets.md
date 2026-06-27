@@ -1,6 +1,6 @@
 # Reveal newly created Todos in long Buckets
 
-Status: ready-for-agent
+Status: done
 
 ## What to build
 

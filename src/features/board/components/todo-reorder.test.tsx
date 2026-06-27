@@ -210,6 +210,14 @@ describe('Todo reordering within a Bucket', () => {
     queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
 
     renderBucket(bucket, queryClient)
+    const bucketList = screen.getByRole('list', { name: 'daily Todos' })
+    const scrollTo = vi.fn()
+    Object.defineProperty(bucketList, 'scrollHeight', { value: 720 })
+    bucketList.scrollTo = scrollTo
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(0)
+      return 1
+    })
 
     act(() => {
       dnd.dragEnd?.({
@@ -238,6 +246,9 @@ describe('Todo reordering within a Bucket', () => {
         },
       })
     })
+    expect(scrollTo).toHaveBeenCalledWith({ behavior: 'smooth', top: 720 })
+
+    vi.unstubAllGlobals()
   })
 
   it('does not move a Todo when dropped on the insertion line immediately before itself', () => {
