@@ -7,6 +7,8 @@ import { useState } from 'react'
 import AddTodoButton from '@/features/board/components/create-todo-button'
 import { SortableTodoCard } from '@/features/board/components/sortable-todo-card'
 import TodoDialog from '@/features/board/components/todo-dialog'
+import { usePendingTodoMove } from '@/features/board/components/todo-drag-drop-provider'
+import type { PendingTodoMove } from '@/features/board/components/todo-drag-drop-provider'
 import { getTodosQueryOptions } from '@/features/board/queries/todo-queries'
 import { Badge } from '@/features/shared/components/ui/badge'
 import { cn } from '@/features/shared/utils/tailwind'
@@ -21,6 +23,8 @@ interface BucketProps {
 // TODO order for todos
 export function BucketColumn({ bucket, buckets }: BucketProps) {
   const { data: todoList = [] } = useSuspenseQuery(getTodosQueryOptions(bucket.id))
+  const pendingTodoMove = usePendingTodoMove()
+  const displayedTodos = applyPendingTodoMove(todoList, bucket.id, pendingTodoMove)
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null)
   const { icon: Icon, textColor, bgColor } = bucketStyles[bucket.type]
   const headingId = `bucket-${bucket.id}-heading`
@@ -34,7 +38,7 @@ export function BucketColumn({ bucket, buckets }: BucketProps) {
         <h2 className={cn('block text-xl font-semibold capitalize', textColor)} id={headingId}>
           {bucket.type}
         </h2>
-        <Badge className={cn(textColor, bgColor)}>{todoList.length}</Badge>
+        <Badge className={cn(textColor, bgColor)}>{displayedTodos.length}</Badge>
         <AddTodoButton bucketId={bucket.id} buckets={buckets} />
       </header>
       <div
@@ -44,8 +48,8 @@ export function BucketColumn({ bucket, buckets }: BucketProps) {
         data-bucket-todo-list
         role='list'
       >
-        <TodoInsertionLine bucketId={bucket.id} index={0} afterTodoId={todoList[0]?.id} />
-        {todoList
+        <TodoInsertionLine bucketId={bucket.id} index={0} afterTodoId={displayedTodos[0]?.id} />
+        {displayedTodos
           .map((todoItem) => (
             <SortableTodoCard key={todoItem.id} bucketId={bucket.id} todo={todoItem} onEdit={setEditingTodo} />
           ))
@@ -55,8 +59,8 @@ export function BucketColumn({ bucket, buckets }: BucketProps) {
               key={`insertion-${index + 1}`}
               bucketId={bucket.id}
               index={index + 1}
-              beforeTodoId={todoList[index]?.id}
-              afterTodoId={todoList[index + 1]?.id}
+              beforeTodoId={displayedTodos[index]?.id}
+              afterTodoId={displayedTodos[index + 1]?.id}
             />,
           ])}
       </div>
@@ -73,6 +77,47 @@ export function BucketColumn({ bucket, buckets }: BucketProps) {
       />
     </section>
   )
+}
+
+function applyPendingTodoMove(todoList: Array<Todo>, bucketId: number, pendingTodoMove: PendingTodoMove | null) {
+  if (
+    !pendingTodoMove ||
+    (bucketId !== pendingTodoMove.sourceBucketId && bucketId !== pendingTodoMove.targetBucketId)
+  ) {
+    return todoList
+  }
+
+  const todoListWithoutMovedTodo = todoList.filter((todo) => todo.id !== pendingTodoMove.todo.id)
+
+  if (bucketId !== pendingTodoMove.targetBucketId) {
+    return todoListWithoutMovedTodo
+  }
+
+  return insertTodo(
+    todoListWithoutMovedTodo,
+    pendingTodoMove.todo,
+    pendingTodoMove.beforeTodoId,
+    pendingTodoMove.afterTodoId,
+  )
+}
+
+function insertTodo(
+  todoList: Array<Todo>,
+  movedTodo: Todo,
+  beforeTodoId: number | undefined,
+  afterTodoId: number | undefined,
+) {
+  if (afterTodoId !== undefined) {
+    const afterIndex = todoList.findIndex((todo) => todo.id === afterTodoId)
+    return todoList.toSpliced(afterIndex === -1 ? todoList.length : afterIndex, 0, movedTodo)
+  }
+
+  if (beforeTodoId !== undefined) {
+    const beforeIndex = todoList.findIndex((todo) => todo.id === beforeTodoId)
+    return todoList.toSpliced(beforeIndex === -1 ? todoList.length : beforeIndex + 1, 0, movedTodo)
+  }
+
+  return [...todoList, movedTodo]
 }
 
 type TodoInsertionData = {
@@ -110,7 +155,10 @@ function TodoInsertionLine({
       data-drop-target={isDropTarget}
       data-testid={id}
       ref={ref}
-      className={cn('mx-2 -my-1 h-2 rounded-full transition-colors', isDropTarget ? 'bg-primary' : 'bg-transparent')}
+      className={cn(
+        'mx-2 -my-1 h-2 shrink-0 rounded-full transition-colors',
+        isDropTarget ? 'bg-primary' : 'bg-transparent',
+      )}
     />
   )
 }

@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 
 import { TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
 import type { Todo } from '@/lib/types/Todo'
@@ -14,6 +15,12 @@ export function useMoveTodo() {
   return useMutation({
     mutationFn: (variables: MoveTodoVariables) => moveTodo({ data: variables.data }),
     onMutate: (variables) => {
+      const affectedBucketIds = getAffectedBucketIds(variables.data.targetBucketId, variables.sourceBucketId)
+
+      void Promise.all(
+        affectedBucketIds.map((bucketId) => queryClient.cancelQueries({ queryKey: [TODOS_QUERY_KEY, bucketId] })),
+      )
+
       const previousTargetTodos = queryClient.getQueryData<Array<Todo>>([
         TODOS_QUERY_KEY,
         variables.data.targetBucketId,
@@ -49,12 +56,33 @@ export function useMoveTodo() {
 
       return { previousTargetTodos }
     },
-    onError: (_error, variables, context) => {
+    onError: async (error, variables, context) => {
       queryClient.setQueryData([TODOS_QUERY_KEY, variables.data.targetBucketId], context?.previousTargetTodos)
 
       if (context?.sourceBucketId !== undefined) {
         queryClient.setQueryData([TODOS_QUERY_KEY, context.sourceBucketId], context.previousSourceTodos)
       }
+
+      const affectedBucketIds = getAffectedBucketIds(variables.data.targetBucketId, context?.sourceBucketId)
+
+      if (await isStaleMoveConflict(error)) {
+        for (const bucketId of affectedBucketIds) {
+          void queryClient.refetchQueries({ queryKey: [TODOS_QUERY_KEY, bucketId], type: 'active' }, {})
+        }
+
+        toast.error('Board refreshed', {
+          description: 'Todo positions changed before your move completed. Review the latest order and try again.',
+        })
+        return
+      }
+
+      for (const bucketId of affectedBucketIds) {
+        void queryClient.invalidateQueries({ queryKey: [TODOS_QUERY_KEY, bucketId] })
+      }
+
+      toast.error('Could not move Todo', {
+        description: 'Your board was restored. Refreshing affected Buckets now.',
+      })
     },
     onSuccess: (result) => {
       for (const bucketId of result.affectedBucketIds) {
@@ -142,3 +170,29 @@ function patchMovedTodoCache(
 function compareTodoPosition(left: Todo, right: Todo) {
   return left.position - right.position || left.id - right.id
 }
+
+function getAffectedBucketIds(targetBucketId: number, sourceBucketId: number | undefined) {
+  return [...new Set([sourceBucketId, targetBucketId].filter((bucketId): bucketId is number => bucketId !== undefined))]
+}
+
+async function isStaleMoveConflict(error: unknown) {
+  if (!(error instanceof Response) || error.status !== 409) {
+    return false
+  }
+
+  try {
+    const body = (await error.clone().json()) as { message?: unknown }
+    return typeof body.message === 'string' && STALE_MOVE_CONFLICT_MESSAGES.has(body.message)
+  } catch {
+    return false
+  }
+}
+
+const STALE_MOVE_CONFLICT_MESSAGES = new Set([
+  'After Todo anchor is not the first Todo in the target Bucket',
+  'After Todo anchor is stale, invalid, or unauthorized',
+  'Before Todo anchor is not the last Todo in the target Bucket',
+  'Before Todo anchor is stale, invalid, or unauthorized',
+  'Todo anchors are not adjacent in the target Bucket',
+  'Todo move conflict; refresh and retry',
+])

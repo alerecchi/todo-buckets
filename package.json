@@ -42,6 +42,7 @@
     "react-dom": "^19.2.6",
     "resend": "^6.12.4",
     "shadcn": "^3.8.5",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.0",
     "vite-tsconfig-paths": "^6.1.1",

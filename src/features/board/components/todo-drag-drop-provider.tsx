@@ -1,10 +1,15 @@
 import { DragDropProvider } from '@dnd-kit/react'
 import type { DragEndEvent } from '@dnd-kit/react'
+import { useQueryClient } from '@tanstack/react-query'
+import { createContext, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 
 import type { TodoDragData } from '@/features/board/components/sortable-todo-card'
 import { useMoveTodo } from '@/features/board/hooks/use-move-todo'
 import { scrollTodoBoard } from '@/features/board/lib/board-auto-scroll'
+import { TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
+import type { Todo } from '@/lib/types/Todo'
 
 type TodoInsertionData = {
   afterTodoId?: number
@@ -13,8 +18,20 @@ type TodoInsertionData = {
   kind: 'todo-insertion'
 }
 
+export type PendingTodoMove = {
+  afterTodoId?: number
+  beforeTodoId?: number
+  sourceBucketId: number
+  targetBucketId: number
+  todo: Todo
+}
+
+const PendingTodoMoveContext = createContext<PendingTodoMove | null>(null)
+
 export function TodoDragDropProvider({ children }: { children: ReactNode }) {
   const { mutate: moveTodo } = useMoveTodo()
+  const queryClient = useQueryClient()
+  const [pendingTodoMove, setPendingTodoMove] = useState<PendingTodoMove | null>(null)
 
   const handleDragMove = (event: unknown, manager: unknown) => {
     if (typeof document === 'undefined') {
@@ -48,22 +65,52 @@ export function TodoDragDropProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    moveTodo({
-      data: removeUndefinedValues({
-        afterTodoId: targetData.afterTodoId,
-        beforeTodoId: targetData.beforeTodoId,
-        id: sourceData.todoId,
-        targetBucketId: targetData.bucketId,
-      }),
-      sourceBucketId: sourceData.bucketId,
-    })
+    const sourceTodos = queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, sourceData.bucketId])
+    const movedTodo = sourceTodos?.find((todo) => todo.id === sourceData.todoId)
+
+    if (movedTodo) {
+      flushSync(() => {
+        setPendingTodoMove(
+          removeUndefinedValues({
+            afterTodoId: targetData.afterTodoId,
+            beforeTodoId: targetData.beforeTodoId,
+            sourceBucketId: sourceData.bucketId,
+            targetBucketId: targetData.bucketId,
+            todo: { ...movedTodo, bucketId: targetData.bucketId },
+          }),
+        )
+      })
+    }
+
+    moveTodo(
+      {
+        data: removeUndefinedValues({
+          afterTodoId: targetData.afterTodoId,
+          beforeTodoId: targetData.beforeTodoId,
+          id: sourceData.todoId,
+          targetBucketId: targetData.bucketId,
+        }),
+        sourceBucketId: sourceData.bucketId,
+      },
+      {
+        onSettled: () => {
+          setPendingTodoMove(null)
+        },
+      },
+    )
   }
 
   return (
-    <DragDropProvider onDragEnd={handleDragEnd} onDragMove={handleDragMove}>
-      {children}
-    </DragDropProvider>
+    <PendingTodoMoveContext value={pendingTodoMove}>
+      <DragDropProvider onDragEnd={handleDragEnd} onDragMove={handleDragMove}>
+        {children}
+      </DragDropProvider>
+    </PendingTodoMoveContext>
   )
+}
+
+export function usePendingTodoMove() {
+  return useContext(PendingTodoMoveContext)
 }
 
 function isTodoDragData(data: unknown): data is TodoDragData {

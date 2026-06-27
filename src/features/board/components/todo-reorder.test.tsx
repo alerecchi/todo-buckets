@@ -8,13 +8,17 @@ import { TodoDragDropProvider } from '@/features/board/components/todo-drag-drop
 import { BUCKETS_QUERY_KEY, TODOS_QUERY_KEY } from '@/features/board/queries/query-keys'
 import type { Bucket } from '@/lib/types/Bucket'
 import type { Todo } from '@/lib/types/Todo'
-import { moveTodo } from '@/server/functions/todos'
+import { getTodos, moveTodo } from '@/server/functions/todos'
 import { createTestQueryClient, render } from '@/test'
 
 const dnd = vi.hoisted(() => ({
   activeDropTargetId: null as string | null,
   dragEnd: undefined as ((event: unknown) => void) | undefined,
   dragMove: undefined as ((event: unknown, manager: unknown) => void) | undefined,
+}))
+
+const toast = vi.hoisted(() => ({
+  error: vi.fn(),
 }))
 
 vi.mock('@dnd-kit/react', () => ({
@@ -55,6 +59,11 @@ vi.mock('@/server/functions/todos', () => ({
   getTodos: vi.fn(() => Promise.resolve([])),
   moveTodo: vi.fn(),
   updateTodo: vi.fn(),
+}))
+
+vi.mock('sonner', () => ({
+  Toaster: () => null,
+  toast,
 }))
 
 vi.mock('@/server/functions/buckets', () => ({
@@ -103,6 +112,12 @@ const destinationTodos = [
 ] satisfies Array<Todo>
 
 const mockedMoveTodo = vi.mocked(moveTodo)
+const mockedGetTodos = vi.mocked(getTodos)
+
+beforeEach(() => {
+  mockedGetTodos.mockReset()
+  mockedGetTodos.mockResolvedValue([])
+})
 
 describe('Todo reordering within a Bucket', () => {
   beforeEach(() => {
@@ -289,7 +304,7 @@ describe('Todo reordering within a Bucket', () => {
     ])
   })
 
-  it('updates the Bucket cache optimistically before the move finishes', () => {
+  it('updates the Bucket cache optimistically before the move finishes', async () => {
     let finishMove: ((todo: Awaited<ReturnType<typeof moveTodo>>) => void) | undefined
     mockedMoveTodo.mockReturnValue(
       new Promise((resolve) => {
@@ -319,17 +334,47 @@ describe('Todo reordering within a Bucket', () => {
       })
     })
 
-    expect(queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, bucket.id])?.map((todo) => todo.id)).toEqual([
-      todos[1].id,
-      todos[0].id,
-      todos[2].id,
-    ])
+    await waitFor(() => {
+      expect(queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, bucket.id])?.map((todo) => todo.id)).toEqual([
+        todos[1].id,
+        todos[0].id,
+        todos[2].id,
+      ])
+    })
 
     finishMove?.({
       affectedBucketIds: [bucket.id],
       affectedTodoPositions: [{ bucketId: bucket.id, id: todos[1].id, position: 512 }],
       todo: { ...todos[1], position: 512, userId: 'user-1' },
     })
+  })
+
+  it('renders the optimistic order before the drag end handler returns', () => {
+    mockedMoveTodo.mockReturnValue(new Promise(() => {}))
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
+
+    renderBucket(bucket, queryClient)
+
+    dnd.dragEnd?.({
+      canceled: false,
+      operation: {
+        source: { data: { bucketId: bucket.id, kind: 'todo', todoId: todos[1].id } },
+        target: {
+          data: {
+            afterTodoId: todos[0].id,
+            beforeTodoId: undefined,
+            bucketId: bucket.id,
+            kind: 'todo-insertion',
+          },
+          id: `bucket-${bucket.id}-insertion-0`,
+        },
+      },
+    })
+
+    expect(
+      screen.getAllByRole('button', { name: /^Drag / }).map((button) => button.getAttribute('aria-label')),
+    ).toEqual(['Drag Second todo', 'Drag First todo', 'Drag Third todo'])
   })
 
   it('shows only the active horizontal insertion line as the drop-position indicator', () => {
@@ -416,6 +461,20 @@ describe('Bucket column layout', () => {
     )
   })
 
+  it('keeps insertion lines available as drop targets when a Bucket list overflows', () => {
+    const manyTodos = Array.from({ length: 24 }, (_, index) =>
+      createTodo({ id: 100 + index, position: (index + 1) * 1024, title: `Todo ${index + 1}` }),
+    )
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], manyTodos)
+
+    renderBucket(bucket, queryClient)
+
+    for (const insertionLine of screen.getAllByTestId(new RegExp(`^bucket-${bucket.id}-insertion-`))) {
+      expect(insertionLine).toHaveClass('shrink-0')
+    }
+  })
+
   it('scrolls the board horizontally during drag near the board edge', () => {
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([BUCKETS_QUERY_KEY], buckets)
@@ -479,6 +538,7 @@ describe('Todo movement across Buckets', () => {
   beforeEach(() => {
     dnd.activeDropTargetId = null
     dnd.dragEnd = undefined
+    toast.error.mockReset()
     mockedMoveTodo.mockReset()
     mockedMoveTodo.mockResolvedValue({
       affectedBucketIds: [bucket.id, destinationBucket.id],
@@ -582,7 +642,7 @@ describe('Todo movement across Buckets', () => {
     })
   })
 
-  it('optimistically moves a Todo across Buckets before the server responds', () => {
+  it('optimistically moves a Todo across Buckets before the server responds', async () => {
     mockedMoveTodo.mockReturnValue(new Promise(() => {}))
     const queryClient = createTestQueryClient()
     queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
@@ -612,6 +672,190 @@ describe('Todo movement across Buckets', () => {
           },
         },
       })
+    })
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, bucket.id])?.map((todo) => todo.id)).toEqual([
+        todos[0].id,
+        todos[2].id,
+      ])
+      expect(
+        queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, destinationBucket.id])?.map((todo) => todo.id),
+      ).toEqual([destinationTodos[0].id, todos[1].id, destinationTodos[1].id])
+    })
+  })
+
+  it('restores affected Bucket caches, refreshes them, and shows a toast when a move fails', async () => {
+    mockedMoveTodo.mockRejectedValue(new Error('Network unavailable'))
+    mockedGetTodos.mockReturnValue(new Promise(() => {}))
+    const queryClient = createTestQueryClient()
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
+    queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
+    queryClient.setQueryData([TODOS_QUERY_KEY, destinationBucket.id], destinationTodos)
+
+    render(
+      <TodoDragDropProvider>
+        <BucketColumn bucket={bucket} buckets={buckets} />
+        <BucketColumn bucket={destinationBucket} buckets={buckets} />
+      </TodoDragDropProvider>,
+      { queryClient },
+    )
+
+    act(() => {
+      dnd.dragEnd?.({
+        canceled: false,
+        operation: {
+          source: { data: { bucketId: bucket.id, kind: 'todo', todoId: todos[1].id } },
+          target: {
+            data: {
+              afterTodoId: destinationTodos[1].id,
+              beforeTodoId: destinationTodos[0].id,
+              bucketId: destinationBucket.id,
+              kind: 'todo-insertion',
+            },
+            id: `bucket-${destinationBucket.id}-insertion-1`,
+          },
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, bucket.id])?.map((todo) => todo.id)).toEqual([
+        todos[0].id,
+        todos[1].id,
+        todos[2].id,
+      ])
+      expect(
+        queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, destinationBucket.id])?.map((todo) => todo.id),
+      ).toEqual([destinationTodos[0].id, destinationTodos[1].id])
+    })
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: [TODOS_QUERY_KEY, bucket.id] })
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: [TODOS_QUERY_KEY, destinationBucket.id] })
+    expect(toast.error).toHaveBeenCalledWith('Could not move Todo', {
+      description: 'Your board was restored. Refreshing affected Buckets now.',
+    })
+  })
+
+  it('refetches affected Bucket caches and shows a refreshed-board toast when stale ordering causes a conflict', async () => {
+    mockedMoveTodo.mockRejectedValue(
+      new Response(JSON.stringify({ message: 'Before Todo anchor is stale, invalid, or unauthorized' }), {
+        status: 409,
+      }),
+    )
+    mockedGetTodos.mockReturnValue(new Promise(() => {}))
+    const queryClient = createTestQueryClient()
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
+    const refetchQueries = vi.spyOn(queryClient, 'refetchQueries')
+    queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
+    queryClient.setQueryData([TODOS_QUERY_KEY, destinationBucket.id], destinationTodos)
+
+    render(
+      <TodoDragDropProvider>
+        <BucketColumn bucket={bucket} buckets={buckets} />
+        <BucketColumn bucket={destinationBucket} buckets={buckets} />
+      </TodoDragDropProvider>,
+      { queryClient },
+    )
+
+    act(() => {
+      dnd.dragEnd?.({
+        canceled: false,
+        operation: {
+          source: { data: { bucketId: bucket.id, kind: 'todo', todoId: todos[1].id } },
+          target: {
+            data: {
+              afterTodoId: destinationTodos[1].id,
+              beforeTodoId: destinationTodos[0].id,
+              bucketId: destinationBucket.id,
+              kind: 'todo-insertion',
+            },
+            id: `bucket-${destinationBucket.id}-insertion-1`,
+          },
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, bucket.id])?.map((todo) => todo.id)).toEqual([
+        todos[0].id,
+        todos[1].id,
+        todos[2].id,
+      ])
+      expect(
+        queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, destinationBucket.id])?.map((todo) => todo.id),
+      ).toEqual([destinationTodos[0].id, destinationTodos[1].id])
+    })
+    expect(refetchQueries).toHaveBeenCalledWith({ queryKey: [TODOS_QUERY_KEY, bucket.id], type: 'active' }, {})
+    expect(refetchQueries).toHaveBeenCalledWith(
+      { queryKey: [TODOS_QUERY_KEY, destinationBucket.id], type: 'active' },
+      {},
+    )
+    expect(invalidateQueries).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith('Board refreshed', {
+      description: 'Todo positions changed before your move completed. Review the latest order and try again.',
+    })
+  })
+
+  it('keeps stale in-flight affected Bucket fetches from overwriting an optimistic move', async () => {
+    mockedMoveTodo.mockReturnValue(new Promise(() => {}))
+    mockedGetTodos.mockReturnValue(new Promise(() => {}))
+    const queryClient = createTestQueryClient()
+    let finishSourceFetch: ((todos: Array<Todo>) => void) | undefined
+    let finishTargetFetch: ((todos: Array<Todo>) => void) | undefined
+    queryClient.setQueryData([TODOS_QUERY_KEY, bucket.id], todos)
+    queryClient.setQueryData([TODOS_QUERY_KEY, destinationBucket.id], destinationTodos)
+    void queryClient.fetchQuery({
+      queryFn: () =>
+        new Promise<Array<Todo>>((resolve) => {
+          finishSourceFetch = resolve
+        }),
+      queryKey: [TODOS_QUERY_KEY, bucket.id],
+    })
+    void queryClient.fetchQuery({
+      queryFn: () =>
+        new Promise<Array<Todo>>((resolve) => {
+          finishTargetFetch = resolve
+        }),
+      queryKey: [TODOS_QUERY_KEY, destinationBucket.id],
+    })
+
+    render(
+      <TodoDragDropProvider>
+        <BucketColumn bucket={bucket} buckets={buckets} />
+        <BucketColumn bucket={destinationBucket} buckets={buckets} />
+      </TodoDragDropProvider>,
+      { queryClient },
+    )
+
+    act(() => {
+      dnd.dragEnd?.({
+        canceled: false,
+        operation: {
+          source: { data: { bucketId: bucket.id, kind: 'todo', todoId: todos[1].id } },
+          target: {
+            data: {
+              afterTodoId: destinationTodos[1].id,
+              beforeTodoId: destinationTodos[0].id,
+              bucketId: destinationBucket.id,
+              kind: 'todo-insertion',
+            },
+            id: `bucket-${destinationBucket.id}-insertion-1`,
+          },
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, bucket.id])?.map((todo) => todo.id)).toEqual([
+        todos[0].id,
+        todos[2].id,
+      ])
+    })
+
+    await act(async () => {
+      finishSourceFetch?.(todos)
+      finishTargetFetch?.(destinationTodos)
+      await Promise.resolve()
     })
 
     expect(queryClient.getQueryData<Array<Todo>>([TODOS_QUERY_KEY, bucket.id])?.map((todo) => todo.id)).toEqual([

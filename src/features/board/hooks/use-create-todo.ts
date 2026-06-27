@@ -22,9 +22,7 @@ function scrollBucketTodoListToEnd(bucketId: number) {
   }
 
   requestAnimationFrame(() => {
-    const bucketList = document.querySelector<HTMLElement>(
-      `[data-bucket-todo-list][data-bucket-id="${bucketId}"]`,
-    )
+    const bucketList = document.querySelector<HTMLElement>(`[data-bucket-todo-list][data-bucket-id="${bucketId}"]`)
 
     bucketList?.scrollTo({ behavior: 'smooth', top: bucketList.scrollHeight })
   })

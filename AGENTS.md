@@ -24,6 +24,7 @@ The current stack is:
 - Zod for validation;
 - Drizzle as a DB ORM (using a Neon backend)
 - Tailwind v4 and shadcn/ui for CSS and UI components. Prefer using shadcn's components when available over creating your own. Never use BaseUI components directly, better propose to install the shadcn component.
+- Sonner (via shadcn) for global toast notifications.
 
 For the TanStack libraries, you have access to the TanStack CLI and you can query docs using that:
 `tanstack search-docs <query> [options]`
